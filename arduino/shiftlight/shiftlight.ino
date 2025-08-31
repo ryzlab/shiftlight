@@ -1,55 +1,26 @@
-#include <CAN.h> // the OBD2 library depends on the CAN library
-#include <OBD2.h> // Install ODB2 by Sandeep Mistry
-#include <math.h>
 
-/*
-+------------------+---------+
-| Microchip MCP2515| Arduino |
-+------------------+---------+
-| VCC              | 5V      |
-| GND              | GND     |
-| SCK              | SCK     |
-| SO               | MISO    |
-| SI               | MOSI    |
-| CS               | 10      |
-| INT              | 2       |
-+------------------+---------+
-*/
+#include <SPI.h>
+#include "mcp_can.h"
+#include "RPMReader.h"
 
+const int CS_PIN = 10;   // MCP2515 CS pin
+const int INT_PIN = 2;   // MCP2515 INT pin
 
-#define LED_COUNT 13
-#define LED_PIN   4
+RPMReader rpmReader(CS_PIN, INT_PIN);
 
 void setup() {
-  Serial.begin(9600);
-  while (!Serial);
-
-  while (true) {
-    Serial.print("Connecting to ODB2 CAN bus..2.");
-
-    if (!OBD2.begin()) {
-      Serial.println(" failed! Sleep and retry.");
-
-      delay(1000);
-    } else {
-      Serial.println(" OK");
-      break;
-    }
-  }
-
-  Serial.println();
+  Serial.begin(115200);
+  while (!Serial) {}
+  rpmReader.init();
 }
+
+unsigned long last = millis();
 
 void loop() {
-  Serial.print("RPM: ");
-  Serial.println(readRpm());
-}
-
-float readRpm() {
-  Serial.print(OBD2.pidName(ENGINE_RPM));
-  float rpm = OBD2.pidRead(ENGINE_RPM);
-  if (isnan(rpm)) {
-    return NAN;
+  rpmReader.loop();
+  if (millis() - last > 10) {
+    last = millis();
+    int currentRpm = rpmReader.getCurrentRpm();
+    Serial.println(currentRpm);
   }
-  return rpm;
 }
