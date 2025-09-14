@@ -118,6 +118,9 @@ class MainActivity : ComponentActivity() {
                     enableAll()
                     val json = buildValuesJson()
                     Log.d("Shiftlight", "Values JSON: $json")
+                    val devices = listUsbSerialDevices(context)
+                    Log.d("Shiftlight", "Available USB devices: ${devices.joinToString(", ")}")
+                    setStatusMessage("S: ${devices.joinToString(", ")}")
                 }
             }
             ShiftlightTheme {
@@ -287,7 +290,7 @@ class MainActivity : ComponentActivity() {
                             Button(
                                 onClick = {
                                     usbDevices = listUsbSerialDevices(context)
-                                    ringValues[0] = usbDevices.joinToString(", ")
+                                    Log.d("Shiftlight", "USB devices: ${usbDevices.joinToString(", ")}")
                                     disableAll()
                                 },
                                 modifier = Modifier
