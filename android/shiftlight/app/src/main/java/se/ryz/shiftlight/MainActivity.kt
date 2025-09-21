@@ -46,7 +46,7 @@ private val globalBuffer = StringBuilder()
 
 private fun readLineFromPort(port: UsbSerialPort): String? {
     val startTime = System.currentTimeMillis()
-    while(true) {
+    while (true) {
         try {
             val newlineIndex = globalBuffer.indexOf("\n")
             Log.d("shiftlight", "Checking line present '$globalBuffer'")
@@ -129,6 +129,7 @@ class MainActivity : ComponentActivity() {
             fun disableAll() {
                 isDisabled = true
             }
+
             fun enableAll() {
                 isDisabled = false
             }
@@ -136,10 +137,10 @@ class MainActivity : ComponentActivity() {
             // Build JSON string from current UI state without arguments
             fun buildValuesJson(): String {
                 val obj = JSONObject()
-                obj.put("ring 1", ringValues.getOrNull(0)?.toIntOrZero() ?: 0)
-                obj.put("ring 2", ringValues.getOrNull(1)?.toIntOrZero() ?: 0)
-                obj.put("ring 3", ringValues.getOrNull(2)?.toIntOrZero() ?: 0)
-                obj.put("ring 4", ringValues.getOrNull(3)?.toIntOrZero() ?: 0)
+                obj.put("ring1", ringValues.getOrNull(0)?.toIntOrZero() ?: 0)
+                obj.put("ring2", ringValues.getOrNull(1)?.toIntOrZero() ?: 0)
+                obj.put("ring3", ringValues.getOrNull(2)?.toIntOrZero() ?: 0)
+                obj.put("ring4", ringValues.getOrNull(3)?.toIntOrZero() ?: 0)
                 obj.put("offset", offsetValue.value.toIntOrZero())
                 return obj.toString()
             }
@@ -148,17 +149,48 @@ class MainActivity : ComponentActivity() {
             fun onAnyFieldChanged() {
                 val json = buildValuesJson()
                 Log.d("Shiftlight", "Values JSON: $json")
+                for ((deviceName, port) in openPorts) {
+                    try {
+                        Log.d("Shiftlight", "Sending ring values JSON to $deviceName: $json")
+                        port.write("$json\n".toByteArray(StandardCharsets.UTF_8), 1000)
+
+                        val responseString = readLineFromPort(port)
+                        if (responseString == "{}") {
+                            Log.d("Shiftlight", "Ring values response from $deviceName: '$responseString'")
+                        } else {
+                            Log.d(
+                                "Shiftlight",
+                                "Invalid ring values response from $deviceName, closing port"
+                            )
+                            setErrorMessage("Invalid ring values response")
+                            port.close()
+                            openPorts.remove(deviceName)
+                            connectedDevices = connectedDevices - deviceName
+                        }
+                    } catch (e: Exception) {
+                        Log.e("Shiftlight", "Ring values communication error with $deviceName", e)
+                        setErrorMessage("Ring values communication error")
+                        port.close()
+                        openPorts.remove(deviceName)
+                        connectedDevices = connectedDevices - deviceName
+                    }
+                }
             }
 
             // Parse JSON string and update edit boxes (expects keys: ring 1..4, offset)
             fun applyValuesJson(json: String) {
                 try {
                     val obj = JSONObject(json)
-                    val r1 = obj.optInt("ring 1", ringValues.getOrNull(0)?.toIntOrZero() ?: 0).coerceIn(0, 20000)
-                    val r2 = obj.optInt("ring 2", ringValues.getOrNull(1)?.toIntOrZero() ?: 0).coerceIn(0, 20000)
-                    val r3 = obj.optInt("ring 3", ringValues.getOrNull(2)?.toIntOrZero() ?: 0).coerceIn(0, 20000)
-                    val r4 = obj.optInt("ring 4", ringValues.getOrNull(3)?.toIntOrZero() ?: 0).coerceIn(0, 20000)
-                    val off = obj.optInt("offset", offsetValue.value.toIntOrZero()).coerceIn(0, 20000)
+                    val r1 = obj.optInt("ring1", ringValues.getOrNull(0)?.toIntOrZero() ?: 0)
+                        .coerceIn(0, 20000)
+                    val r2 = obj.optInt("ring2", ringValues.getOrNull(1)?.toIntOrZero() ?: 0)
+                        .coerceIn(0, 20000)
+                    val r3 = obj.optInt("ring3", ringValues.getOrNull(2)?.toIntOrZero() ?: 0)
+                        .coerceIn(0, 20000)
+                    val r4 = obj.optInt("ring4", ringValues.getOrNull(3)?.toIntOrZero() ?: 0)
+                        .coerceIn(0, 20000)
+                    val off =
+                        obj.optInt("offset", offsetValue.value.toIntOrZero()).coerceIn(0, 20000)
 
                     if (ringValues.size >= 4) {
                         ringValues[0] = r1.toString()
@@ -181,12 +213,20 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(Unit) {
                 setStatusMessage("Not connected")
+                disableAll()
                 while (true) {
-                    delay(2000)
-                    enableAll()
+                    delay(1000)
+                    //enableAll()
                     val json = buildValuesJson()
                     Log.d("Shiftlight", "Values JSON: $json")
                     val devices = listUsbSerialDevices(context)
+                    if (devices.size == 0) {
+                        disableAll()
+                        openPorts.clear()
+                        connectedDevices = emptySet()
+                    } else if (connectedDevices.size > 0) {
+                        enableAll()
+                    }
                     Log.d("Shiftlight", "Available USB devices: ${devices.joinToString(", ")}")
                     Log.d("shiftlight", "Connected: ${!openPorts.isEmpty()}")
                     //setStatusMessage("S: ${devices.joinToString(", ")}")
@@ -226,20 +266,33 @@ class MainActivity : ComponentActivity() {
                             launch {
                                 try {
                                     Log.d("Shiftlight", "Sending RPM JSON to $deviceName: $rpmJson")
-                                    port.write("$rpmJson\n".toByteArray(StandardCharsets.UTF_8), 1000)
+                                    port.write(
+                                        "$rpmJson\n".toByteArray(StandardCharsets.UTF_8),
+                                        1000
+                                    )
 
                                     val responseString = readLineFromPort(port)
                                     if (responseString == "{}") {
-                                        Log.d("Shiftlight", "RPM response from $deviceName: '$responseString'")
+                                        Log.d(
+                                            "Shiftlight",
+                                            "RPM response from $deviceName: '$responseString'"
+                                        )
                                     } else {
-                                        Log.d("Shiftlight", "Invalid RPM response from $deviceName, closing port")
+                                        Log.d(
+                                            "Shiftlight",
+                                            "Invalid RPM response from $deviceName, closing port"
+                                        )
                                         setErrorMessage("Invalid RPM response")
                                         port.close()
                                         openPorts.remove(deviceName)
                                         connectedDevices = connectedDevices - deviceName
                                     }
                                 } catch (e: Exception) {
-                                    Log.e("Shiftlight", "RPM communication error with $deviceName", e)
+                                    Log.e(
+                                        "Shiftlight",
+                                        "RPM communication error with $deviceName",
+                                        e
+                                    )
                                     setErrorMessage("RPM communication error")
                                     port.close()
                                     openPorts.remove(deviceName)
@@ -323,22 +376,35 @@ class MainActivity : ComponentActivity() {
                                             modifier = Modifier.padding(end = 12.dp)
                                         )
                                         OutlinedTextField(
-                                            value = ringValues[i-1],
+                                            value = ringValues[i - 1],
                                             onValueChange = { newValue ->
                                                 val digitsOnly = newValue.filter { it.isDigit() }
                                                 if (digitsOnly.isEmpty()) {
-                                                    ringValues[i-1] = ""
+                                                    ringValues[i - 1] = ""
                                                 } else {
-                                                    val clamped = digitsOnly.toIntOrNull()?.coerceIn(0, 20000) ?: 0
-                                                    ringValues[i-1] = clamped.toString()
+                                                    val clamped =
+                                                        digitsOnly.toIntOrNull()?.coerceIn(0, 20000)
+                                                            ?: 0
+                                                    ringValues[i - 1] = clamped.toString()
                                                 }
                                                 onAnyFieldChanged()
                                             },
                                             singleLine = true,
                                             enabled = !isDisabled,
                                             modifier = Modifier.fillMaxWidth(),
-                                            trailingIcon = { Text("rpm", color = if (isDisabled) Color(0xFF9E9E9E) else Color(0xFFB0B0B0)) },
-                                            textStyle = TextStyle(color = if (isDisabled) Color(0xFFBDBDBD) else Color.White),
+                                            trailingIcon = {
+                                                Text(
+                                                    "rpm",
+                                                    color = if (isDisabled) Color(0xFF9E9E9E) else Color(
+                                                        0xFFB0B0B0
+                                                    )
+                                                )
+                                            },
+                                            textStyle = TextStyle(
+                                                color = if (isDisabled) Color(
+                                                    0xFFBDBDBD
+                                                ) else Color.White
+                                            ),
                                             colors = TextFieldDefaults.colors(
                                                 focusedContainerColor = Color(0xFF23272A),
                                                 unfocusedContainerColor = Color(0xFF23272A),
@@ -361,7 +427,9 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Text(
                                         text = "offset",
-                                        color = if (isDisabled) Color(0xFF777777) else Color(0xFFFFC300),
+                                        color = if (isDisabled) Color(0xFF777777) else Color(
+                                            0xFFFFC300
+                                        ),
                                         style = MaterialTheme.typography.bodyLarge,
                                         modifier = Modifier.padding(end = 12.dp)
                                     )
@@ -372,7 +440,9 @@ class MainActivity : ComponentActivity() {
                                             if (digitsOnly.isEmpty()) {
                                                 offsetValue.value = ""
                                             } else {
-                                                val clamped = digitsOnly.toIntOrNull()?.coerceIn(0, 20000) ?: 0
+                                                val clamped =
+                                                    digitsOnly.toIntOrNull()?.coerceIn(0, 20000)
+                                                        ?: 0
                                                 offsetValue.value = clamped.toString()
                                             }
                                             onAnyFieldChanged()
@@ -380,8 +450,19 @@ class MainActivity : ComponentActivity() {
                                         singleLine = true,
                                         enabled = !isDisabled,
                                         modifier = Modifier.fillMaxWidth(),
-                                        trailingIcon = { Text("rpm", color = if (isDisabled) Color(0xFF9E9E9E) else Color(0xFFB0B0B0)) },
-                                        textStyle = TextStyle(color = if (isDisabled) Color(0xFFBDBDBD) else Color.White),
+                                        trailingIcon = {
+                                            Text(
+                                                "rpm",
+                                                color = if (isDisabled) Color(0xFF9E9E9E) else Color(
+                                                    0xFFB0B0B0
+                                                )
+                                            )
+                                        },
+                                        textStyle = TextStyle(
+                                            color = if (isDisabled) Color(
+                                                0xFFBDBDBD
+                                            ) else Color.White
+                                        ),
                                         colors = TextFieldDefaults.colors(
                                             focusedContainerColor = Color(0xFF23272A),
                                             unfocusedContainerColor = Color(0xFF23272A),
@@ -404,7 +485,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 Slider(
                                     value = sliderValue,
-                                    onValueChange = { 
+                                    onValueChange = {
                                         sliderValue = it
                                         sliderChanged = true
                                     },
@@ -446,7 +527,10 @@ class MainActivity : ComponentActivity() {
                             Button(
                                 onClick = {
                                     usbDevices = listUsbSerialDevices(context)
-                                    Log.d("Shiftlight", "USB devices: ${usbDevices.joinToString(", ")}")
+                                    Log.d(
+                                        "Shiftlight",
+                                        "USB devices: ${usbDevices.joinToString(", ")}"
+                                    )
                                     disableAll()
                                 },
                                 modifier = Modifier
@@ -485,18 +569,22 @@ class MainActivity : ComponentActivity() {
 
     // Removed the parameterized buildValuesJson; now using a no-arg version inside setContent
 
-    private suspend fun tryConnectToDevice(context: Context, deviceName: String, openPorts: MutableMap<String, UsbSerialPort>): String? {
+    private suspend fun tryConnectToDevice(
+        context: Context,
+        deviceName: String,
+        openPorts: MutableMap<String, UsbSerialPort>
+    ): String? {
         try {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
             val availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
-            
+
             val driver = availableDrivers.find { driver ->
                 val device = driver.device
                 val vendor = device.vendorId.toString(16).padStart(4, '0')
                 val product = device.productId.toString(16).padStart(4, '0')
                 "USB VID:PID ${vendor}:${product}" == deviceName
             }
-            
+
             if (driver != null) {
                 val port = driver.ports[0] // Use first port
                 Log.d("Shiftlight", "Opening port for $deviceName at 115200 baud")
@@ -508,10 +596,10 @@ class MainActivity : ComponentActivity() {
                 // Send "{}" and wait for response
                 Log.d("Shiftlight", "Sending '{}' to $deviceName")
                 port.write("{}\n".toByteArray(StandardCharsets.UTF_8), 1000)
-                
+
                 val response = ByteArray(1024)
                 var bytesRead: Int? = null
-                
+
                 // Loop to read until a valid line is received or timeout
                 while (true) {
                     val responseString = withTimeoutOrNull(1000) {
@@ -520,7 +608,7 @@ class MainActivity : ComponentActivity() {
                     if (responseString != null) {
                         //val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
                         Log.d("Shiftlight", "Received from $deviceName: '$responseString'")
-                        
+
                         // Check if the first character is '#'
                         if (responseString.startsWith("#")) {
                             Log.d("Shiftlight", "Ignoring comment line: '$responseString'")
