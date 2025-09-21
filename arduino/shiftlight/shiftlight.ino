@@ -75,6 +75,7 @@ void parseAndHandleString(byte* byteArray, size_t length) {
 }
 
 void handleEmptyJson() {
+  delay(500);
   // Generate JSON and print it
   String jsonString = generateJson();
   //setLedBrightness(3000);
@@ -83,10 +84,24 @@ void handleEmptyJson() {
 
 void handleRpmJson(int rpm) {
   // Call setLedBrightness with the RPM value
+  Serial.print("# Setting led brightness to ");
+  Serial.println(rpm);
   setLedBrightness(rpm);
+  Serial.println("{}");
 }
 
 void handleComplexJson(int ring1, int ring2, int ring3, int ring4, int offset) {
+  Serial.print("# Received rings ");
+  Serial.print(ring1);
+  Serial.print(", ");
+  Serial.print(ring2);
+  Serial.print(", ");
+  Serial.print(ring3);
+  Serial.print(", ");
+  Serial.print(ring4);
+  Serial.print(", offset: ");
+  Serial.println(offset);
+  Serial.println("{}");
   // Implement the function to handle complex JSON
 }
 

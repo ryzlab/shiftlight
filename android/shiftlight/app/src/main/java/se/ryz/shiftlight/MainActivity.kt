@@ -40,6 +40,63 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager
 import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.launch
+import java.io.IOException
+
+private val globalBuffer = StringBuilder()
+
+private fun readLineFromPort(port: UsbSerialPort): String? {
+    val startTime = System.currentTimeMillis()
+    while(true) {
+        try {
+            val newlineIndex = globalBuffer.indexOf("\n")
+            Log.d("shiftlight", "Checking line present '$globalBuffer'")
+            if (newlineIndex != -1) {
+                val line = globalBuffer.substring(0, newlineIndex + 1).trim()
+                globalBuffer.delete(0, newlineIndex + 1)
+                if (line.startsWith("#")) {
+                    Log.d("shiftlight", "Comment line: '$line'")
+                } else {
+                    Log.d("shiftlight", "Returning line '$line'")
+                    return line
+                }
+            }
+
+            val buffer = ByteArray(1024)
+            val bytesRead = port.read(buffer, 1000)
+            if (bytesRead > 0) {
+                Log.d("shiftlight", "Read data: $bytesRead")
+                val chunk = String(buffer, 0, bytesRead, StandardCharsets.UTF_8)
+                Log.d("shiftlight", "chunk: '$chunk'")
+                globalBuffer.append(chunk)
+                val newlineIndex = globalBuffer.indexOf("\n")
+                Log.d("shiftlight", "Read '$globalBuffer'")
+                if (newlineIndex != -1) {
+                    val line = globalBuffer.substring(0, newlineIndex + 1).trim()
+                    globalBuffer.delete(0, newlineIndex + 1)
+                    if (line.startsWith("#")) {
+                        Log.d("shiftlight", "Comment line: '$line'")
+                    } else {
+                        Log.d("shiftlight", "Returning line2: '$line'")
+                        return line
+                    }
+                }
+            } else {
+                Log.d("shiftlight", "Received no data, len: $bytesRead")
+                //return null
+            }
+        } catch (e: IOException) {
+            Log.d("shiftlight", "EXCEPTION WHILE READING: $e")
+            return null
+        }
+        val endTime = System.currentTimeMillis()
+        if (endTime - startTime > 1000) {
+            Log.d("shiftlight", "Received no line within timeout")
+            globalBuffer.clear()
+            return null
+        }
+    }
+    //return null
+}
 
 class MainActivity : ComponentActivity() {
     private var statusText: String = ""
@@ -123,6 +180,7 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(Unit) {
+                setStatusMessage("Not connected")
                 while (true) {
                     delay(2000)
                     enableAll()
@@ -130,7 +188,8 @@ class MainActivity : ComponentActivity() {
                     Log.d("Shiftlight", "Values JSON: $json")
                     val devices = listUsbSerialDevices(context)
                     Log.d("Shiftlight", "Available USB devices: ${devices.joinToString(", ")}")
-                    setStatusMessage("S: ${devices.joinToString(", ")}")
+                    Log.d("shiftlight", "Connected: ${!openPorts.isEmpty()}")
+                    //setStatusMessage("S: ${devices.joinToString(", ")}")
 
                     // Try to connect to devices only when no port is currently connected
                     if (openPorts.isEmpty()) {
@@ -169,27 +228,12 @@ class MainActivity : ComponentActivity() {
                                     Log.d("Shiftlight", "Sending RPM JSON to $deviceName: $rpmJson")
                                     port.write("$rpmJson\n".toByteArray(StandardCharsets.UTF_8), 1000)
 
-                                    val response = ByteArray(1024)
-                                    val bytesRead = withTimeoutOrNull(1000) {
-                                        port.read(response, 1000)
-                                    }
-
-                                    if (bytesRead != null && bytesRead > 0) {
-                                        val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
+                                    val responseString = readLineFromPort(port)
+                                    if (responseString == "{}") {
                                         Log.d("Shiftlight", "RPM response from $deviceName: '$responseString'")
-
-                                        if (responseString == "{}") {
-                                            Log.d("Shiftlight", "Valid RPM response from $deviceName")
-                                        } else {
-                                            Log.d("Shiftlight", "Invalid RPM response from $deviceName, closing port")
-                                            setErrorMessage("Invalid RPM response")
-                                            port.close()
-                                            openPorts.remove(deviceName)
-                                            connectedDevices = connectedDevices - deviceName
-                                        }
                                     } else {
-                                        Log.d("Shiftlight", "No RPM response from $deviceName, closing port")
-                                        setErrorMessage("No RPM response")
+                                        Log.d("Shiftlight", "Invalid RPM response from $deviceName, closing port")
+                                        setErrorMessage("Invalid RPM response")
                                         port.close()
                                         openPorts.remove(deviceName)
                                         connectedDevices = connectedDevices - deviceName
@@ -206,19 +250,14 @@ class MainActivity : ComponentActivity() {
                     }
 
                     // Communicate with open ports
-                    for ((deviceName, port) in openPorts) {
+                    /*for ((deviceName, port) in openPorts) {
                         launch {
                             try {
                                 Log.d("Shiftlight", "Sending '{}' to $deviceName")
                                 port.write("{}\n".toByteArray(StandardCharsets.UTF_8), 1000)
 
-                                val response = ByteArray(1024)
-                                val bytesRead = withTimeoutOrNull(1000) {
-                                    port.read(response, 1000)
-                                }
-
-                                if (bytesRead != null && bytesRead > 0) {
-                                    val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
+                                val responseString = readLineFromPort(port)
+                                if (responseString != null) {
                                     Log.d("Shiftlight", "Received from $deviceName: '$responseString'")
 
                                     try {
@@ -238,7 +277,7 @@ class MainActivity : ComponentActivity() {
                                 connectedDevices = connectedDevices - deviceName
                             }
                         }
-                    }
+                    }*/
                 }
             }
             ShiftlightTheme {
@@ -462,7 +501,7 @@ class MainActivity : ComponentActivity() {
                 val port = driver.ports[0] // Use first port
                 Log.d("Shiftlight", "Opening port for $deviceName at 115200 baud")
                 port.open(usbManager.openDevice(driver.device))
-                port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+                port.setParameters(9600, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
                 port.dtr = true
                 port.rts = true
                 Thread.sleep(100) // Add a short delay to stabilize the connection
@@ -475,11 +514,11 @@ class MainActivity : ComponentActivity() {
                 
                 // Loop to read until a valid line is received or timeout
                 while (true) {
-                    bytesRead = withTimeoutOrNull(1000) {
-                        port.read(response, 1000)
+                    val responseString = withTimeoutOrNull(1000) {
+                        readLineFromPort(port)
                     }
-                    if (bytesRead != null && bytesRead > 0) {
-                        val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
+                    if (responseString != null) {
+                        //val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
                         Log.d("Shiftlight", "Received from $deviceName: '$responseString'")
                         
                         // Check if the first character is '#'
@@ -496,6 +535,7 @@ class MainActivity : ComponentActivity() {
                             } catch (e: Exception) {
                                 Log.d("Shiftlight", "Invalid JSON response from $deviceName: $e")
                                 // Invalid JSON response, close port
+                                setErrorMessage("KKKKKKKKKKKKK")
                                 port.close()
                                 null
                             }
