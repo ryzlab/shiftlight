@@ -42,6 +42,19 @@ import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private var statusText: String = ""
+    private var statusColor: Color = Color.White
+
+    fun setStatusMessage(message: String) {
+        statusText = message
+        statusColor = Color.White
+    }
+
+    fun setErrorMessage(message: String) {
+        statusText = message
+        statusColor = Color(0xFFFF5555)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -52,8 +65,6 @@ class MainActivity : ComponentActivity() {
             val offsetValue = remember { mutableStateOf("") }
             var sliderValue by remember { mutableStateOf(0f) }
             var isDisabled by remember { mutableStateOf(false) }
-            var statusText by remember { mutableStateOf("") }
-            var statusColor by remember { mutableStateOf(Color.White) }
             var connectedDevices by remember { mutableStateOf(setOf<String>()) }
             var openPorts by remember { mutableStateOf(mutableMapOf<String, UsbSerialPort>()) }
             var sliderChanged by remember { mutableStateOf(false) }
@@ -111,16 +122,6 @@ class MainActivity : ComponentActivity() {
                 return obj.toString()
             }
 
-            // Status message helpers
-            fun setErrorMessage(message: String) {
-                statusText = message
-                statusColor = Color(0xFFFF5555)
-            }
-            fun setStatusMessage(message: String) {
-                statusText = message
-                statusColor = Color.White
-            }
-
             LaunchedEffect(Unit) {
                 while (true) {
                     delay(2000)
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
                     val devices = listUsbSerialDevices(context)
                     Log.d("Shiftlight", "Available USB devices: ${devices.joinToString(", ")}")
                     setStatusMessage("S: ${devices.joinToString(", ")}")
-                    
+
                     // Try to connect to devices only when no port is currently connected
                     if (openPorts.isEmpty()) {
                         Log.d("Shiftlight", "No open ports. Attempting connection sequentially.")
@@ -144,6 +145,7 @@ class MainActivity : ComponentActivity() {
                                 connectedDevices = connectedDevices + device
                                 enableAll()
                                 connected = true
+                                setStatusMessage("connected")
                                 break // Stop at first successful device
                             } else {
                                 Log.d("Shiftlight", "Connection failed to: $device")
@@ -153,29 +155,29 @@ class MainActivity : ComponentActivity() {
                             setErrorMessage("Not connected")
                         }
                     }
-                    
+
                     // Handle slider changes
                     if (sliderChanged) {
                         sliderChanged = false
                         val rpmJson = buildRpmJson()
                         Log.d("Shiftlight", "RPM JSON: $rpmJson")
-                        
+
                         // Send RPM JSON to all open ports
                         for ((deviceName, port) in openPorts) {
                             launch {
                                 try {
                                     Log.d("Shiftlight", "Sending RPM JSON to $deviceName: $rpmJson")
                                     port.write("$rpmJson\n".toByteArray(StandardCharsets.UTF_8), 1000)
-                                    
+
                                     val response = ByteArray(1024)
                                     val bytesRead = withTimeoutOrNull(1000) {
                                         port.read(response, 1000)
                                     }
-                                    
+
                                     if (bytesRead != null && bytesRead > 0) {
                                         val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
                                         Log.d("Shiftlight", "RPM response from $deviceName: '$responseString'")
-                                        
+
                                         if (responseString == "{}") {
                                             Log.d("Shiftlight", "Valid RPM response from $deviceName")
                                         } else {
@@ -202,23 +204,23 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    
+
                     // Communicate with open ports
                     for ((deviceName, port) in openPorts) {
                         launch {
                             try {
                                 Log.d("Shiftlight", "Sending '{}' to $deviceName")
                                 port.write("{}\n".toByteArray(StandardCharsets.UTF_8), 1000)
-                                
+
                                 val response = ByteArray(1024)
                                 val bytesRead = withTimeoutOrNull(1000) {
                                     port.read(response, 1000)
                                 }
-                                
+
                                 if (bytesRead != null && bytesRead > 0) {
                                     val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
                                     Log.d("Shiftlight", "Received from $deviceName: '$responseString'")
-                                    
+
                                     try {
                                         applyValuesJson(responseString)
                                         Log.d("Shiftlight", "Successfully applied JSON from $deviceName")
@@ -444,7 +446,6 @@ class MainActivity : ComponentActivity() {
 
     // Removed the parameterized buildValuesJson; now using a no-arg version inside setContent
 
-    // Try to connect to a serial device and test communication
     private suspend fun tryConnectToDevice(context: Context, deviceName: String, openPorts: MutableMap<String, UsbSerialPort>): String? {
         try {
             val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -459,43 +460,57 @@ class MainActivity : ComponentActivity() {
             
             if (driver != null) {
                 val port = driver.ports[0] // Use first port
-                Log.d("Shiftlight", "Opening port for $deviceName at 9600 baud")
+                Log.d("Shiftlight", "Opening port for $deviceName at 115200 baud")
                 port.open(usbManager.openDevice(driver.device))
-                port.setParameters(9600, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-                
+                port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+                port.dtr = true
+                port.rts = true
+                Thread.sleep(100) // Add a short delay to stabilize the connection
                 // Send "{}" and wait for response
                 Log.d("Shiftlight", "Sending '{}' to $deviceName")
                 port.write("{}\n".toByteArray(StandardCharsets.UTF_8), 1000)
                 
                 val response = ByteArray(1024)
-                val bytesRead = withTimeoutOrNull(1000) {
-                    port.read(response, 1000)
-                }
+                var bytesRead: Int? = null
                 
-                if (bytesRead != null && bytesRead > 0) {
-                    val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8)
-                    Log.d("Shiftlight", "Received response from $deviceName: '$responseString'")
-                    return try {
-                        JSONObject(responseString) // Validate JSON
-                        Log.d("Shiftlight", "Valid JSON response from $deviceName")
-                        // Keep port open for successful connections
-                        openPorts[deviceName] = port
-                        responseString
-                    } catch (e: Exception) {
-                        Log.d("Shiftlight", "Invalid JSON response from $deviceName: $e")
-                        // Invalid JSON response, close port
-                        port.close()
-                        null
+                // Loop to read until a valid line is received or timeout
+                while (true) {
+                    bytesRead = withTimeoutOrNull(1000) {
+                        port.read(response, 1000)
                     }
-                } else {
-                    Log.d("Shiftlight", "No response received from $deviceName within timeout")
-                    // No response, close port
-                    port.close()
+                    if (bytesRead != null && bytesRead > 0) {
+                        val responseString = String(response, 0, bytesRead, StandardCharsets.UTF_8).trim()
+                        Log.d("Shiftlight", "Received from $deviceName: '$responseString'")
+                        
+                        // Check if the first character is '#'
+                        if (responseString.startsWith("#")) {
+                            Log.d("Shiftlight", "Ignoring comment line: '$responseString'")
+                            continue // Read again
+                        } else {
+                            return try {
+                                JSONObject(responseString) // Validate JSON
+                                Log.d("Shiftlight", "Valid JSON response from $deviceName")
+                                // Keep port open for successful connections
+                                openPorts[deviceName] = port
+                                responseString
+                            } catch (e: Exception) {
+                                Log.d("Shiftlight", "Invalid JSON response from $deviceName: $e")
+                                // Invalid JSON response, close port
+                                port.close()
+                                null
+                            }
+                        }
+                    } else {
+                        // No data received within timeout
+                        bytesRead = null
+                        break
+                    }
                 }
             }
             return null
         } catch (e: Exception) {
             Log.e("Shiftlight", "Connection failed for $deviceName", e)
+            setErrorMessage("Connection failed")
             return null
         }
     }
