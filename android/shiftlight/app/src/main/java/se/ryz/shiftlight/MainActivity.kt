@@ -182,15 +182,15 @@ class MainActivity : ComponentActivity() {
                 try {
                     val obj = JSONObject(json)
                     val r1 = obj.optInt("ring1", ringValues.getOrNull(0)?.toIntOrZero() ?: 0)
-                        .coerceIn(0, 20000)
+                        .coerceIn(0, 9999)
                     val r2 = obj.optInt("ring2", ringValues.getOrNull(1)?.toIntOrZero() ?: 0)
-                        .coerceIn(0, 20000)
+                        .coerceIn(0, 9999)
                     val r3 = obj.optInt("ring3", ringValues.getOrNull(2)?.toIntOrZero() ?: 0)
-                        .coerceIn(0, 20000)
+                        .coerceIn(0, 9999)
                     val r4 = obj.optInt("ring4", ringValues.getOrNull(3)?.toIntOrZero() ?: 0)
-                        .coerceIn(0, 20000)
+                        .coerceIn(0, 9999)
                     val off =
-                        obj.optInt("offset", offsetValue.value.toIntOrZero()).coerceIn(0, 20000)
+                        obj.optInt("offset", offsetValue.value.toIntOrZero()).coerceIn(0, 9999)
 
                     if (ringValues.size >= 4) {
                         ringValues[0] = r1.toString()
@@ -214,47 +214,54 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 setStatusMessage("Not connected")
                 disableAll()
+                var counter = 0
                 while (true) {
-                    delay(1000)
+                    delay(50)
                     //enableAll()
-                    val json = buildValuesJson()
-                    Log.d("Shiftlight", "Values JSON: $json")
-                    val devices = listUsbSerialDevices(context)
-                    if (devices.size == 0) {
-                        disableAll()
-                        openPorts.clear()
-                        connectedDevices = emptySet()
-                    } else if (connectedDevices.size > 0) {
-                        enableAll()
-                    }
-                    Log.d("Shiftlight", "Available USB devices: ${devices.joinToString(", ")}")
-                    Log.d("shiftlight", "Connected: ${!openPorts.isEmpty()}")
-                    //setStatusMessage("S: ${devices.joinToString(", ")}")
+                    counter++
+                    if (counter > 40) {
+                        counter = 0
+                        //val json = buildValuesJson()
+                        //Log.d("Shiftlight", "Values JSON: $json")
+                        val devices = listUsbSerialDevices(context)
+                        if (devices.size == 0) {
+                            disableAll()
+                            openPorts.clear()
+                            connectedDevices = emptySet()
+                        } else if (connectedDevices.size > 0) {
+                            enableAll()
+                        }
+                        Log.d("Shiftlight", "Available USB devices: ${devices.joinToString(", ")}")
+                        Log.d("shiftlight", "Connected: ${!openPorts.isEmpty()}")
+                        //setStatusMessage("S: ${devices.joinToString(", ")}")
 
-                    // Try to connect to devices only when no port is currently connected
-                    if (openPorts.isEmpty()) {
-                        Log.d("Shiftlight", "No open ports. Attempting connection sequentially.")
-                        var connected = false
-                        for (device in devices) {
-                            Log.d("Shiftlight", "Attempting connection to: $device")
-                            val responseJson = tryConnectToDevice(context, device, openPorts)
-                            if (responseJson != null) {
-                                Log.d("Shiftlight", "Connection successful to: $device")
-                                applyValuesJson(responseJson)
-                                connectedDevices = connectedDevices + device
-                                enableAll()
-                                connected = true
-                                setStatusMessage("connected")
-                                break // Stop at first successful device
-                            } else {
-                                Log.d("Shiftlight", "Connection failed to: $device")
+                        // Try to connect to devices only when no port is currently connected
+                        if (openPorts.isEmpty()) {
+                            Log.d(
+                                "Shiftlight",
+                                "No open ports. Attempting connection sequentially."
+                            )
+                            var connected = false
+                            for (device in devices) {
+                                Log.d("Shiftlight", "Attempting connection to: $device")
+                                val responseJson = tryConnectToDevice(context, device, openPorts)
+                                if (responseJson != null) {
+                                    Log.d("Shiftlight", "Connection successful to: $device")
+                                    applyValuesJson(responseJson)
+                                    connectedDevices = connectedDevices + device
+                                    enableAll()
+                                    connected = true
+                                    setStatusMessage("connected")
+                                    break // Stop at first successful device
+                                } else {
+                                    Log.d("Shiftlight", "Connection failed to: $device")
+                                }
+                            }
+                            if (!connected) {
+                                setErrorMessage("Not connected")
                             }
                         }
-                        if (!connected) {
-                            setErrorMessage("Not connected")
-                        }
                     }
-
                     // Handle slider changes
                     if (sliderChanged) {
                         sliderChanged = false
@@ -383,7 +390,7 @@ class MainActivity : ComponentActivity() {
                                                     ringValues[i - 1] = ""
                                                 } else {
                                                     val clamped =
-                                                        digitsOnly.toIntOrNull()?.coerceIn(0, 20000)
+                                                        digitsOnly.toIntOrNull()?.coerceIn(0, 9999)
                                                             ?: 0
                                                     ringValues[i - 1] = clamped.toString()
                                                 }
@@ -441,7 +448,7 @@ class MainActivity : ComponentActivity() {
                                                 offsetValue.value = ""
                                             } else {
                                                 val clamped =
-                                                    digitsOnly.toIntOrNull()?.coerceIn(0, 20000)
+                                                    digitsOnly.toIntOrNull()?.coerceIn(0, 9999)
                                                         ?: 0
                                                 offsetValue.value = clamped.toString()
                                             }
@@ -489,8 +496,8 @@ class MainActivity : ComponentActivity() {
                                         sliderValue = it
                                         sliderChanged = true
                                     },
-                                    valueRange = 0f..20000f,
-                                    steps = 19999,
+                                    valueRange = 0f..9999f,
+                                    steps = 9998,
                                     enabled = !isDisabled,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = SliderDefaults.colors(
@@ -524,7 +531,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
-                            Button(
+                            /*Button(
                                 onClick = {
                                     usbDevices = listUsbSerialDevices(context)
                                     Log.d(
@@ -545,7 +552,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             ) {
                                 Text("Connect", style = MaterialTheme.typography.bodyLarge)
-                            }
+                            }*/
                         }
                     }
                 }
