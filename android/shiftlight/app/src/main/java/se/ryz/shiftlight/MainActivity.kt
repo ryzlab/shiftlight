@@ -41,6 +41,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.launch
 import java.io.IOException
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 
 private val globalBuffer = StringBuilder()
 
@@ -126,6 +130,11 @@ class MainActivity : ComponentActivity() {
             var openPorts by remember { mutableStateOf(mutableMapOf<String, UsbSerialPort>()) }
             var sliderChanged by remember { mutableStateOf(false) }
 
+            // Dropdown options list - easy to add more options
+            val dropdownOptions = listOf("snake", "rings")
+            var expanded by remember { mutableStateOf(false) }
+            var selectedOption by remember { mutableStateOf("snake") }
+
             fun disableAll() {
                 isDisabled = true
             }
@@ -142,6 +151,9 @@ class MainActivity : ComponentActivity() {
                 obj.put("ring3", ringValues.getOrNull(2)?.toIntOrZero() ?: 0)
                 obj.put("ring4", ringValues.getOrNull(3)?.toIntOrZero() ?: 0)
                 obj.put("offset", offsetValue.value.toIntOrZero())
+                // Add mode key with index of selected dropdown value
+                val modeIndex = dropdownOptions.indexOf(selectedOption)
+                obj.put("mode", modeIndex)
                 return obj.toString()
             }
 
@@ -177,7 +189,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Parse JSON string and update edit boxes (expects keys: ring 1..4, offset)
+            // Parse JSON string and update edit boxes (expects keys: ring 1..4, offset, mode)
             fun applyValuesJson(json: String) {
                 try {
                     val obj = JSONObject(json)
@@ -191,6 +203,12 @@ class MainActivity : ComponentActivity() {
                         .coerceIn(0, 9999)
                     val off =
                         obj.optInt("offset", offsetValue.value.toIntOrZero()).coerceIn(0, 9999)
+                    
+                    // Read mode value and update dropdown selection
+                    val modeIndex = obj.optInt("mode", 0).coerceIn(0, dropdownOptions.size - 1)
+                    if (modeIndex < dropdownOptions.size) {
+                        selectedOption = dropdownOptions[modeIndex]
+                    }
 
                     if (ringValues.size >= 4) {
                         ringValues[0] = r1.toString()
@@ -353,7 +371,7 @@ class MainActivity : ComponentActivity() {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(24.dp),
+                                .padding(16.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(
@@ -367,13 +385,13 @@ class MainActivity : ComponentActivity() {
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = 12.dp)
+                                        .padding(bottom = 6.dp)
                                 )
                                 for (i in 1..4) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 8.dp),
+                                            .padding(vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
@@ -482,13 +500,43 @@ class MainActivity : ComponentActivity() {
                                         )
                                     )
                                 }
-                                // Slider block (value display and slider) below offset
-                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                // Dropdown menu above slider
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = selectedOption,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { expanded = true }
+                                            .background(Color(0xFF23272A))
+                                            .padding(16.dp),
+                                        color = Color.White
+                                    )
+                                    DropdownMenu(
+                                        expanded = expanded,
+                                        onDismissRequest = { expanded = false },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        dropdownOptions.forEach { option ->
+                                            DropdownMenuItem(
+                                                text = { Text(text = option) },
+                                                onClick = {
+                                                    selectedOption = option
+                                                    expanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                // Slider block (value display and slider) below dropdown
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "Emulated RPM: ${sliderValue.toInt()}",
                                     color = if (isDisabled) Color(0xFF9E9E9E) else Color(0xFFFFC300),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.padding(vertical = 8.dp)
+                                    modifier = Modifier.padding(vertical = 4.dp)
                                 )
                                 Slider(
                                     value = sliderValue,
@@ -517,7 +565,7 @@ class MainActivity : ComponentActivity() {
                                     enabled = true,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 24.dp),
+                                        .padding(top = 12.dp),
                                     textStyle = TextStyle(color = statusColor),
                                     colors = TextFieldDefaults.colors(
                                         focusedContainerColor = Color(0xFF23272A),

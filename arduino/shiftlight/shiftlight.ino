@@ -69,7 +69,8 @@ void parseAndHandleString(byte* byteArray, size_t length) {
       int ring3 = doc["ring3"];
       int ring4 = doc["ring4"];
       int offset = doc["offset"];
-      handleComplexJson(ring1, ring2, ring3, ring4, offset);
+      int mode = doc["mode"];
+      handleComplexJson(ring1, ring2, ring3, ring4, offset, mode);
     }
   }
 }
@@ -90,7 +91,7 @@ void handleRpmJson(int rpm) {
   Serial.println("{}");
 }
 
-void handleComplexJson(int ring1, int ring2, int ring3, int ring4, int offset) {
+void handleComplexJson(int ring1, int ring2, int ring3, int ring4, int offset, int mode) {
   Serial.print("# Received rings ");
   Serial.print(ring1);
   Serial.print(", ");
@@ -100,8 +101,9 @@ void handleComplexJson(int ring1, int ring2, int ring3, int ring4, int offset) {
   Serial.print(", ");
   Serial.print(ring4);
   Serial.print(", offset: ");
-  Serial.println(offset);
-  Serial.println("{}");
+  Serial.print(offset);
+  Serial.print(", mode: ");
+  Serial.println(mode);
   // Implement the function to handle complex JSON
 }
 
@@ -124,6 +126,7 @@ String generateJson() {
   doc["ring3"] = 1234;
   doc["ring4"] = 1234;
   doc["offset"] = 234;
+  doc["mode"] = 1;
   String jsonString;
   serializeJson(doc, jsonString);
   return jsonString;
