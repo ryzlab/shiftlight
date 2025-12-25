@@ -15,6 +15,94 @@ RPMReader rpmReader(CS_PIN, INT_PIN);
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+const int MAX_LINE_LENGTH = 256;
+char inputBuffer[MAX_LINE_LENGTH + 1];  // Buffer to hold incoming data
+int inputIndex = 0;  // Current position in buffer
+bool discardingLine = false;  // Flag to track if we're discarding a line
+
+bool readSerialLine(char* line, int lineSize) {
+  // Clear the output parameter
+  if (line != nullptr && lineSize > 0) {
+    line[0] = '\0';
+  }
+  
+  // Only process one character per call (non-blocking)
+  if (!Serial.available()) {
+    return false;
+  }
+  
+  char inChar = (char)Serial.read();
+  
+  if (inChar == '\n' || inChar == '\r') {
+    if (discardingLine) {
+      // Finished discarding the long line, reset flag
+      discardingLine = false;
+      inputIndex = 0;
+      return false;
+    }
+    
+    // Process the line if we have data
+    if (inputIndex > 0) {
+      // Null-terminate the buffer
+      inputBuffer[inputIndex] = '\0';
+      
+      // Find start of non-whitespace
+      int start = 0;
+      while (start < inputIndex && (inputBuffer[start] == ' ' || inputBuffer[start] == '\t')) {
+        start++;
+      }
+      
+      // Find end of non-whitespace
+      int end = inputIndex - 1;
+      while (end >= start && (inputBuffer[end] == ' ' || inputBuffer[end] == '\t' || inputBuffer[end] == '\r' || inputBuffer[end] == '\n')) {
+        end--;
+      }
+      
+      // Calculate trimmed length
+      int trimmedLength = end - start + 1;
+      
+      // Ignore empty lines (after trimming)
+      if (trimmedLength <= 0) {
+        inputIndex = 0;
+        return false;
+      }
+      
+      // Ignore lines starting with #
+      if (inputBuffer[start] == '#') {
+        inputIndex = 0;
+        return false;
+      }
+      
+      // Copy trimmed line to output buffer
+      if (line != nullptr && lineSize > 0) {
+        int copyLength = (trimmedLength < lineSize - 1) ? trimmedLength : lineSize - 1;
+        strncpy(line, &inputBuffer[start], copyLength);
+        line[copyLength] = '\0';
+      }
+      
+      inputIndex = 0;
+      return true;
+    }
+  } else {
+    if (discardingLine) {
+      // Continue discarding characters until newline
+      return false;
+    }
+    
+    // Add character to buffer if there's space
+    if (inputIndex < MAX_LINE_LENGTH) {
+      inputBuffer[inputIndex++] = inChar;
+    } else {
+      // Buffer full, start discarding
+      inputIndex = 0;
+      discardingLine = true;
+    }
+  }
+  
+  // No line ready yet
+  return false;
+}
+
 void setup() {
   Serial.begin(9600);
   while (!Serial) {}
@@ -25,8 +113,6 @@ void setup() {
 
 unsigned long last = millis();
 
-String inputString = "";  // A String to hold incoming data
-
 void loop() {
   /*rpmReader.loop();
   if (millis() - last > 10) {
@@ -35,99 +121,10 @@ void loop() {
     Serial.println(currentRpm);
   }*/
 
-  // Read from serial until a new-line character is encountered
-  while (Serial.available()) {
-    char inChar = (char)Serial.read();
-    inputString += inChar;
-    if (inChar == '\n') {
-      parseAndHandleString((byte*)inputString.c_str(), inputString.length());
-      inputString = "";  // Clear the string for the next input
-    }
+  char line[MAX_LINE_LENGTH + 1];
+  if (readSerialLine(line, sizeof(line))) {
+    // Process the line here
+    // TODO: Add your line processing logic here
   }
 }
 
-void parseAndHandleString(byte* byteArray, size_t length) {
-  // Convert byte array to String
-  String inputString = String((char*)byteArray);
-  inputString.trim(); // Remove trailing new-line
-
-  if (inputString == "{}") {
-    handleEmptyJson();
-  } else if (inputString.startsWith("{\"rpm\":")) {
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, inputString);
-    if (!error) {
-      int rpm = doc["rpm"];
-      handleRpmJson(rpm);
-    }
-  } else {
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, inputString);
-    if (!error) {
-      int ring1 = doc["ring1"];
-      int ring2 = doc["ring2"];
-      int ring3 = doc["ring3"];
-      int ring4 = doc["ring4"];
-      int offset = doc["offset"];
-      int mode = doc["mode"];
-      handleComplexJson(ring1, ring2, ring3, ring4, offset, mode);
-    }
-  }
-}
-
-void handleEmptyJson() {
-  delay(500);
-  // Generate JSON and print it
-  String jsonString = generateJson();
-  //setLedBrightness(3000);
-  Serial.println(jsonString);
-}
-
-void handleRpmJson(int rpm) {
-  // Call setLedBrightness with the RPM value
-  Serial.print("# Setting led brightness to ");
-  Serial.println(rpm);
-  setLedBrightness(rpm);
-  Serial.println("{}");
-}
-
-void handleComplexJson(int ring1, int ring2, int ring3, int ring4, int offset, int mode) {
-  Serial.print("# Received rings ");
-  Serial.print(ring1);
-  Serial.print(", ");
-  Serial.print(ring2);
-  Serial.print(", ");
-  Serial.print(ring3);
-  Serial.print(", ");
-  Serial.print(ring4);
-  Serial.print(", offset: ");
-  Serial.print(offset);
-  Serial.print(", mode: ");
-  Serial.println(mode);
-  // Implement the function to handle complex JSON
-}
-
-void setLedBrightness(int value) {
-  int numLedsToLight = map(value, 0, 5000, 0, NUM_LEDS);
-  for (int i = 0; i < NUM_LEDS; i++) {
-    if (i < numLedsToLight) {
-      strip.setPixelColor(i, strip.Color(255, 0, 0)); // Red color
-    } else {
-      strip.setPixelColor(i, strip.Color(0, 0, 0)); // Off
-    }
-  }
-  strip.show();
-}
-
-String generateJson() {
-  StaticJsonDocument<200> doc;
-  doc["ring1"] = 1234;
-  doc["ring2"] = 1234;
-  doc["ring3"] = 1234;
-  doc["ring4"] = 1234;
-  doc["offset"] = 234;
-  doc["mode"] = 1;
-  String jsonString;
-  serializeJson(doc, jsonString);
-  return jsonString;
-}

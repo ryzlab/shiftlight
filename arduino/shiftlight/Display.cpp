@@ -1,80 +1,124 @@
 #include "Display.h"
 #include <EEPROM.h>
+#include <cstring> // Required for strchr, strncpy, strlen, atoi
 
 Display::Display() {
   imageCount = 0;
 }
 
-Display::Image Display::parseImageFromString(const String& csvString) {
+Display::Image Display::parseImageFromString(const char* csvString) {
   Image img = {0, 0, 0, 0, 0, 0, 0, 0, 0};
   
-  // Find the bitmask section in brackets
-  int bracketStart = csvString.indexOf('[');
-  int bracketEnd = csvString.indexOf(']');
+  if (csvString == nullptr) {
+    return img;
+  }
   
-  if (bracketStart >= 0 && bracketEnd > bracketStart) {
+  // Find the bitmask section in brackets
+  const char* bracketStart = strchr(csvString, '[');
+  const char* bracketEnd = strchr(csvString, ']');
+  
+  if (bracketStart != nullptr && bracketEnd != nullptr && bracketEnd > bracketStart) {
     // Extract the content inside brackets
-    String bitmaskStr = csvString.substring(bracketStart + 1, bracketEnd);
-    
-    // Parse comma-separated indices and build bitmask (max 14 bits, so 0-13)
-    int startIdx = 0;
-    while (startIdx < bitmaskStr.length()) {
-      int commaIdx = bitmaskStr.indexOf(',', startIdx);
-      if (commaIdx < 0) commaIdx = bitmaskStr.length();
+    int bitmaskLen = bracketEnd - bracketStart - 1;
+    if (bitmaskLen > 0) {
+      // Parse comma-separated indices and build bitmask (max 14 bits, so 0-13)
+      char bitmaskBuffer[128];  // Temporary buffer for bitmask section
+      int copyLen = (bitmaskLen < 127) ? bitmaskLen : 127;
+      strncpy(bitmaskBuffer, bracketStart + 1, copyLen);
+      bitmaskBuffer[copyLen] = '\0';
       
-      String numStr = bitmaskStr.substring(startIdx, commaIdx);
-      numStr.trim();
-      int bitIndex = numStr.toInt();
-      
-      if (bitIndex >= 0 && bitIndex < 14) {
-        img.bitmask |= (1U << bitIndex);
+      char* token = strtok(bitmaskBuffer, ",");
+      while (token != nullptr) {
+        // Trim whitespace from token
+        while (*token == ' ' || *token == '\t') token++;
+        char* end = token + strlen(token) - 1;
+        while (end > token && (*end == ' ' || *end == '\t')) {
+          *end = '\0';
+          end--;
+        }
+        
+        int bitIndex = atoi(token);
+        if (bitIndex >= 0 && bitIndex < 14) {
+          img.bitmask |= (1U << bitIndex);
+        }
+        
+        token = strtok(nullptr, ",");
       }
-      
-      startIdx = commaIdx + 1;
     }
   }
   
   // Extract the rest of the CSV after the closing bracket
-  int csvStart = csvString.indexOf(']') + 1;
-  String csvPart = csvString.substring(csvStart);
-  csvPart.trim();
-  
-  // Remove leading comma if present
-  if (csvPart.startsWith(",")) {
-    csvPart = csvPart.substring(1);
-  }
-  
-  // Parse the remaining CSV values (9 values: 8 existing + 1 blinkrate)
-  int values[9];
-  int valueIndex = 0;
-  int startPos = 0;
-  
-  while (startPos < csvPart.length() && valueIndex < 9) {
-    int commaPos = csvPart.indexOf(',', startPos);
-    if (commaPos < 0) commaPos = csvPart.length();
+  if (bracketEnd != nullptr) {
+    const char* csvStart = bracketEnd + 1;
     
-    String valStr = csvPart.substring(startPos, commaPos);
-    valStr.trim();
-    values[valueIndex++] = valStr.toInt();
+    // Skip leading whitespace
+    while (*csvStart == ' ' || *csvStart == '\t') csvStart++;
     
-    startPos = commaPos + 1;
-  }
-  
-  // Assign values to struct
-  if (valueIndex >= 9) {
-    img.startRPM = values[0];
-    img.endRPM = values[1];
-    img.startRed = values[2];
-    img.startGreen = values[3];
-    img.startBlue = values[4];
-    img.endRed = values[5];
-    img.endGreen = values[6];
-    img.endBlue = values[7];
+    // Remove leading comma if present
+    if (*csvStart == ',') {
+      csvStart++;
+    }
     
-    // Extract the last value (0-3) and store in bits 14-15 of 16-bit bitmask
-    int blinkValue = values[8];
-    if (blinkValue >= 0 && blinkValue <= 3) {
-      img.bitmask |= ((unsigned int)blinkValue << 14);
+    // Parse the remaining CSV values (9 values: 8 existing + 1 blinkrate)
+    int values[9];
+    int valueIndex = 0;
+    const char* pos = csvStart;
+    
+    while (*pos != '\0' && valueIndex < 9) {
+      // Skip whitespace
+      while (*pos == ' ' || *pos == '\t') pos++;
+      
+      if (*pos == '\0') break;
+      
+      // Find next comma or end of string
+      const char* commaPos = strchr(pos, ',');
+      int valueLen;
+      if (commaPos != nullptr) {
+        valueLen = commaPos - pos;
+      } else {
+        valueLen = strlen(pos);
+      }
+      
+      // Extract value
+      char valueBuffer[32];
+      int copyLen = (valueLen < 31) ? valueLen : 31;
+      strncpy(valueBuffer, pos, copyLen);
+      valueBuffer[copyLen] = '\0';
+      
+      // Trim whitespace
+      char* valStart = valueBuffer;
+      while (*valStart == ' ' || *valStart == '\t') valStart++;
+      char* valEnd = valStart + strlen(valStart) - 1;
+      while (valEnd > valStart && (*valEnd == ' ' || *valEnd == '\t')) {
+        *valEnd = '\0';
+        valEnd--;
+      }
+      
+      values[valueIndex++] = atoi(valStart);
+      
+      if (commaPos != nullptr) {
+        pos = commaPos + 1;
+      } else {
+        break;
+      }
+    }
+    
+    // Assign values to struct
+    if (valueIndex >= 9) {
+      img.startRPM = values[0];
+      img.endRPM = values[1];
+      img.startRed = values[2];
+      img.startGreen = values[3];
+      img.startBlue = values[4];
+      img.endRed = values[5];
+      img.endGreen = values[6];
+      img.endBlue = values[7];
+      
+      // Extract the last value (0-3) and store in bits 14-15 of 16-bit bitmask
+      int blinkValue = values[8];
+      if (blinkValue >= 0 && blinkValue <= 3) {
+        img.bitmask |= ((unsigned int)blinkValue << 14);
+      }
     }
   }
   
@@ -178,7 +222,7 @@ void Display::processRPM(int rpm) {
   }
 }
 
-bool Display::addImageFromString(const String& csvString) {
+bool Display::addImageFromString(const char* csvString) {
   // Parse the image from the CSV string
   Image img = parseImageFromString(csvString);
   

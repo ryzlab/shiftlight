@@ -20,7 +20,7 @@ class Display {
     int imageCount;
     ColorResult colorResult;
 
-    static Image parseImageFromString(const String& csvString);
+    static Image parseImageFromString(const char* csvString);
     bool addImage(const Image& img);
     static void calculateColors(int rpm, const Image& img, ColorResult& result);
 
@@ -36,7 +36,7 @@ class Display {
     void writeImagesToEEPROM();
     bool readImagesFromEEPROM();
     void processRPM(int rpm);
-    bool addImageFromString(const String& csvString);
+    bool addImageFromString(const char* csvString);
     void clearImages();
 
 
