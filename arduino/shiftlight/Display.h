@@ -1,6 +1,16 @@
 #ifndef Display_h
 #define Display_h
 #include <Arduino.h>
+#include <Adafruit_NeoPixel.h>
+
+// Forward declaration or define ColorResult before the class
+struct ColorResult {
+  uint8_t red[14];
+  uint8_t green[14];
+  uint8_t blue[14];
+  uint8_t blinkRate[14];
+};
+
 class Display {
   private:
     struct Image {
@@ -19,20 +29,14 @@ class Display {
     Image images[MAX_IMAGES];
     int imageCount;
     ColorResult colorResult;
+    Adafruit_NeoPixel* strip;  // Private instance variable
 
     static Image parseImageFromString(const char* csvString);
     bool addImage(const Image& img);
     static void calculateColors(int rpm, const Image& img, ColorResult& result);
 
   public:
-    struct ColorResult {
-      uint8_t red[14];
-      uint8_t green[14];
-      uint8_t blue[14];
-      uint8_t blinkRate[14];
-    };
-
-    Display();
+    Display(Adafruit_NeoPixel* strip);
     void writeImagesToEEPROM();
     bool readImagesFromEEPROM();
     void processRPM(int rpm);

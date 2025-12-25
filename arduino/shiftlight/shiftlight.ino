@@ -4,6 +4,7 @@
 #include "RPMReader.h"
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h>
+#include "Display.h"
 
 const int CS_PIN = 10;   // MCP2515 CS pin
 const int INT_PIN = 2;   // MCP2515 INT pin
@@ -15,10 +16,13 @@ RPMReader rpmReader(CS_PIN, INT_PIN);
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+Display display(&strip);  // Pass pointer to strip
+
 const int MAX_LINE_LENGTH = 256;
 char inputBuffer[MAX_LINE_LENGTH + 1];  // Buffer to hold incoming data
 int inputIndex = 0;  // Current position in buffer
 bool discardingLine = false;  // Flag to track if we're discarding a line
+bool readingImages = false;  // Flag to track if we're in image reading mode
 
 bool readSerialLine(char* line, int lineSize) {
   // Clear the output parameter
@@ -123,8 +127,42 @@ void loop() {
 
   char line[MAX_LINE_LENGTH + 1];
   if (readSerialLine(line, sizeof(line))) {
-    // Process the line here
-    // TODO: Add your line processing logic here
+    // Check for rpm command
+    if (strncmp(line, "rpm=", 4) == 0) {
+      const char* equalsPos = strchr(line, '=');
+      if (equalsPos != nullptr) {
+        // Parse the integer value (can be multi-digit, 0-9999)
+        int rpm = atoi(equalsPos + 1);
+        // Validate range
+        if (rpm >= 0 && rpm <= 9999) {
+          display.processRPM(rpm);
+        }
+      }
+    }
+    // Check for BEGIN command
+    else if (strcmp(line, "BEGIN") == 0) {
+      display.clearImages();
+      readingImages = true;
+      // Optionally send acknowledgment
+      // Serial.println("# BEGIN - ready to receive images");
+    }
+    // Check for END command
+    else if (strcmp(line, "END") == 0) {
+      if (readingImages) {
+        display.writeImagesToEEPROM();
+        readingImages = false;
+        // Optionally send acknowledgment
+        // Serial.println("# END - images written to EEPROM");
+      }
+    }
+    // If in reading mode, parse and add image
+    else if (readingImages) {
+      if (display.addImageFromString(line)) {
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR");
+      }
+    }
   }
 }
 

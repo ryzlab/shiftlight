@@ -1,8 +1,9 @@
 #include "Display.h"
 #include <EEPROM.h>
-#include <cstring> // Required for strchr, strncpy, strlen, atoi
+#include <string.h>  // Required for strchr, strncpy, strlen
+#include <stdlib.h>   // Required for atoi
 
-Display::Display() {
+Display::Display(Adafruit_NeoPixel* strip) : strip(strip) {
   imageCount = 0;
 }
 
