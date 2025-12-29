@@ -26,12 +26,14 @@ class Display {
     };
 
     static const int MAX_IMAGES = 32;
+    static const unsigned int INVALID_BITMASK = 0xFFFF;  // Sentinel value for invalid images
     Image images[MAX_IMAGES];
     int imageCount;
     ColorResult colorResult;
     Adafruit_NeoPixel* strip;  // Private instance variable
 
     static Image parseImageFromString(const char* csvString);
+    static bool isValidImage(const Image& img);
     bool addImage(const Image& img);
     static void calculateColors(int rpm, const Image& img, ColorResult& result);
 

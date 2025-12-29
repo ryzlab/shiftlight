@@ -11,6 +11,7 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   Image img = {0, 0, 0, 0, 0, 0, 0, 0, 0};
   
   if (csvString == nullptr) {
+    img.bitmask = INVALID_BITMASK;
     return img;
   }
   
@@ -18,112 +19,153 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   const char* bracketStart = strchr(csvString, '[');
   const char* bracketEnd = strchr(csvString, ']');
   
-  if (bracketStart != nullptr && bracketEnd != nullptr && bracketEnd > bracketStart) {
-    // Extract the content inside brackets
-    int bitmaskLen = bracketEnd - bracketStart - 1;
-    if (bitmaskLen > 0) {
-      // Parse comma-separated indices and build bitmask (max 14 bits, so 0-13)
-      char bitmaskBuffer[128];  // Temporary buffer for bitmask section
-      int copyLen = (bitmaskLen < 127) ? bitmaskLen : 127;
-      strncpy(bitmaskBuffer, bracketStart + 1, copyLen);
-      bitmaskBuffer[copyLen] = '\0';
-      
-      char* token = strtok(bitmaskBuffer, ",");
-      while (token != nullptr) {
-        // Trim whitespace from token
-        while (*token == ' ' || *token == '\t') token++;
-        char* end = token + strlen(token) - 1;
-        while (end > token && (*end == ' ' || *end == '\t')) {
-          *end = '\0';
-          end--;
-        }
-        
-        int bitIndex = atoi(token);
-        if (bitIndex >= 0 && bitIndex < 14) {
-          img.bitmask |= (1U << bitIndex);
-        }
-        
-        token = strtok(nullptr, ",");
+  if (bracketStart == nullptr || bracketEnd == nullptr || bracketEnd <= bracketStart) {
+    img.bitmask = INVALID_BITMASK;
+    return img;
+  }
+  
+  // Extract the content inside brackets
+  int bitmaskLen = bracketEnd - bracketStart - 1;
+  if (bitmaskLen > 0) {
+    // Parse comma-separated indices and build bitmask (max 14 bits, so 0-13)
+    char bitmaskBuffer[128];  // Temporary buffer for bitmask section
+    int copyLen = (bitmaskLen < 127) ? bitmaskLen : 127;
+    strncpy(bitmaskBuffer, bracketStart + 1, copyLen);
+    bitmaskBuffer[copyLen] = '\0';
+    
+    char* token = strtok(bitmaskBuffer, ",");
+    while (token != nullptr) {
+      // Trim whitespace from token
+      while (*token == ' ' || *token == '\t') token++;
+      char* end = token + strlen(token) - 1;
+      while (end > token && (*end == ' ' || *end == '\t')) {
+        *end = '\0';
+        end--;
       }
+      
+      // Check if token contains a range (dash)
+      char* dashPos = strchr(token, '-');
+      if (dashPos != nullptr) {
+        // Parse range: start-end
+        *dashPos = '\0';  // Split the token at the dash
+        int rangeStart = atoi(token);
+        int rangeEnd = atoi(dashPos + 1);
+        
+        // Validate range values are in range (0-13)
+        if (rangeStart < 0 || rangeStart >= 14 || rangeEnd < 0 || rangeEnd >= 14) {
+          img.bitmask = INVALID_BITMASK;
+          return img;
+        }
+        
+        // Ensure rangeStart <= rangeEnd
+        if (rangeStart > rangeEnd) {
+          int temp = rangeStart;
+          rangeStart = rangeEnd;
+          rangeEnd = temp;
+        }
+        
+        // Set all bits in the range
+        for (int i = rangeStart; i <= rangeEnd; i++) {
+          img.bitmask |= (1U << i);
+        }
+      } else {
+        // Single value - validate it's in range (0-13)
+        int bitIndex = atoi(token);
+        if (bitIndex < 0 || bitIndex >= 14) {
+          img.bitmask = INVALID_BITMASK;
+          return img;
+        }
+        img.bitmask |= (1U << bitIndex);
+      }
+      
+      token = strtok(nullptr, ",");
     }
   }
   
   // Extract the rest of the CSV after the closing bracket
-  if (bracketEnd != nullptr) {
-    const char* csvStart = bracketEnd + 1;
+  const char* csvStart = bracketEnd + 1;
+  
+  // Skip leading whitespace
+  while (*csvStart == ' ' || *csvStart == '\t') csvStart++;
+  
+  // Remove leading comma if present
+  if (*csvStart == ',') {
+    csvStart++;
+  }
+  
+  // Parse the remaining CSV values (must be exactly 9 values)
+  int values[9];
+  int valueIndex = 0;
+  const char* pos = csvStart;
+  
+  while (*pos != '\0' && valueIndex < 10) {  // Check up to 10 to detect too many
+    // Skip whitespace
+    while (*pos == ' ' || *pos == '\t') pos++;
     
-    // Skip leading whitespace
-    while (*csvStart == ' ' || *csvStart == '\t') csvStart++;
+    if (*pos == '\0') break;
     
-    // Remove leading comma if present
-    if (*csvStart == ',') {
-      csvStart++;
+    // Find next comma or end of string
+    const char* commaPos = strchr(pos, ',');
+    int valueLen;
+    if (commaPos != nullptr) {
+      valueLen = commaPos - pos;
+    } else {
+      valueLen = strlen(pos);
     }
     
-    // Parse the remaining CSV values (9 values: 8 existing + 1 blinkrate)
-    int values[9];
-    int valueIndex = 0;
-    const char* pos = csvStart;
+    // Extract value
+    char valueBuffer[32];
+    int copyLen = (valueLen < 31) ? valueLen : 31;
+    strncpy(valueBuffer, pos, copyLen);
+    valueBuffer[copyLen] = '\0';
     
-    while (*pos != '\0' && valueIndex < 9) {
-      // Skip whitespace
-      while (*pos == ' ' || *pos == '\t') pos++;
-      
-      if (*pos == '\0') break;
-      
-      // Find next comma or end of string
-      const char* commaPos = strchr(pos, ',');
-      int valueLen;
-      if (commaPos != nullptr) {
-        valueLen = commaPos - pos;
-      } else {
-        valueLen = strlen(pos);
-      }
-      
-      // Extract value
-      char valueBuffer[32];
-      int copyLen = (valueLen < 31) ? valueLen : 31;
-      strncpy(valueBuffer, pos, copyLen);
-      valueBuffer[copyLen] = '\0';
-      
-      // Trim whitespace
-      char* valStart = valueBuffer;
-      while (*valStart == ' ' || *valStart == '\t') valStart++;
-      char* valEnd = valStart + strlen(valStart) - 1;
-      while (valEnd > valStart && (*valEnd == ' ' || *valEnd == '\t')) {
-        *valEnd = '\0';
-        valEnd--;
-      }
-      
-      values[valueIndex++] = atoi(valStart);
-      
-      if (commaPos != nullptr) {
-        pos = commaPos + 1;
-      } else {
-        break;
-      }
+    // Trim whitespace
+    char* valStart = valueBuffer;
+    while (*valStart == ' ' || *valStart == '\t') valStart++;
+    char* valEnd = valStart + strlen(valStart) - 1;
+    while (valEnd > valStart && (*valEnd == ' ' || *valEnd == '\t')) {
+      *valEnd = '\0';
+      valEnd--;
     }
     
-    // Assign values to struct
-    if (valueIndex >= 9) {
-      img.startRPM = values[0];
-      img.endRPM = values[1];
-      img.startRed = values[2];
-      img.startGreen = values[3];
-      img.startBlue = values[4];
-      img.endRed = values[5];
-      img.endGreen = values[6];
-      img.endBlue = values[7];
-      
-      // Extract the last value (0-3) and store in bits 14-15 of 16-bit bitmask
-      int blinkValue = values[8];
-      if (blinkValue >= 0 && blinkValue <= 3) {
-        img.bitmask |= ((unsigned int)blinkValue << 14);
-      }
+    values[valueIndex++] = atoi(valStart);
+    
+    if (commaPos != nullptr) {
+      pos = commaPos + 1;
+    } else {
+      break;
     }
   }
   
+  // Validate exactly 9 values (not more, not less)
+  if (valueIndex != 9) {
+    img.bitmask = INVALID_BITMASK;
+    return img;
+  }
+  
+  // Assign values to struct
+  img.startRPM = values[0];
+  img.endRPM = values[1];
+  img.startRed = values[2];
+  img.startGreen = values[3];
+  img.startBlue = values[4];
+  img.endRed = values[5];
+  img.endGreen = values[6];
+  img.endBlue = values[7];
+  
+  // Extract the last value (0-2) and store in bits 14-15 of 16-bit bitmask
+  int blinkValue = values[8];
+  if (blinkValue < 0 || blinkValue > 2) {
+    img.bitmask = INVALID_BITMASK;
+    return img;
+  }
+  img.bitmask |= ((unsigned int)blinkValue << 14);
+  
   return img;
+}
+
+bool Display::isValidImage(const Image& img) {
+  return img.bitmask != INVALID_BITMASK;
 }
 
 void Display::clearImages() {
@@ -226,6 +268,11 @@ void Display::processRPM(int rpm) {
 bool Display::addImageFromString(const char* csvString) {
   // Parse the image from the CSV string
   Image img = parseImageFromString(csvString);
+  
+  // Check if the image is valid
+  if (!isValidImage(img)) {
+    return false;
+  }
   
   // Add the image to the array
   return addImage(img);
