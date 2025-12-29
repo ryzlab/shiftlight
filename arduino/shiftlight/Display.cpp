@@ -3,6 +3,10 @@
 #include <string.h>  // Required for strchr, strncpy, strlen
 #include <stdlib.h>   // Required for atoi
 
+// External references to prefixes defined in main file
+extern const char* ERROR_PREFIX;
+extern const char* SUCCESS_PREFIX;
+
 Display::Display(Adafruit_NeoPixel* strip) : strip(strip) {
   imageCount = 0;
 }
@@ -11,6 +15,8 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   Image img = {0, 0, 0, 0, 0, 0, 0, 0, 0};
   
   if (csvString == nullptr) {
+    Serial.print(ERROR_PREFIX);
+    Serial.println("Null CSV string");
     img.bitmask = INVALID_BITMASK;
     return img;
   }
@@ -20,6 +26,8 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   const char* bracketEnd = strchr(csvString, ']');
   
   if (bracketStart == nullptr || bracketEnd == nullptr || bracketEnd <= bracketStart) {
+    Serial.print(ERROR_PREFIX);
+    Serial.println("Missing or invalid brackets");
     img.bitmask = INVALID_BITMASK;
     return img;
   }
@@ -53,6 +61,11 @@ Display::Image Display::parseImageFromString(const char* csvString) {
         
         // Validate range values are in range (0-13)
         if (rangeStart < 0 || rangeStart >= 14 || rangeEnd < 0 || rangeEnd >= 14) {
+          Serial.print(ERROR_PREFIX);
+          Serial.print("Invalid bitmask range: ");
+          Serial.print(rangeStart);
+          Serial.print("-");
+          Serial.println(rangeEnd);
           img.bitmask = INVALID_BITMASK;
           return img;
         }
@@ -72,6 +85,9 @@ Display::Image Display::parseImageFromString(const char* csvString) {
         // Single value - validate it's in range (0-13)
         int bitIndex = atoi(token);
         if (bitIndex < 0 || bitIndex >= 14) {
+          Serial.print(ERROR_PREFIX);
+          Serial.print("Invalid bitmask value: ");
+          Serial.println(bitIndex);
           img.bitmask = INVALID_BITMASK;
           return img;
         }
@@ -139,6 +155,10 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   
   // Validate exactly 9 values (not more, not less)
   if (valueIndex != 9) {
+    Serial.print(ERROR_PREFIX);
+    Serial.print("Invalid number of CSV values: ");
+    Serial.print(valueIndex);
+    Serial.println(" (expected 9)");
     img.bitmask = INVALID_BITMASK;
     return img;
   }
@@ -156,10 +176,18 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   // Extract the last value (0-2) and store in bits 14-15 of 16-bit bitmask
   int blinkValue = values[8];
   if (blinkValue < 0 || blinkValue > 2) {
+    Serial.print(ERROR_PREFIX);
+    Serial.print("Invalid blink value: ");
+    Serial.print(blinkValue);
+    Serial.println(" (expected 0-2)");
     img.bitmask = INVALID_BITMASK;
     return img;
   }
   img.bitmask |= ((unsigned int)blinkValue << 14);
+  
+  // Success - optionally print success message
+  // Serial.print(SUCCESS_PREFIX);
+  // Serial.println("Image parsed successfully");
   
   return img;
 }

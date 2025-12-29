@@ -6,6 +6,10 @@
 #include <Adafruit_NeoPixel.h>
 #include "Display.h"
 
+// Error and success message prefixes
+const char* ERROR_PREFIX = "ERR: ";
+const char* SUCCESS_PREFIX = "OK: ";
+
 const int CS_PIN = 10;   // MCP2515 CS pin
 const int INT_PIN = 2;   // MCP2515 INT pin
 
