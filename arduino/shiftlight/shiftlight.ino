@@ -152,8 +152,6 @@ void loop() {
       display.clearImages();
       readingImages = true;
       Serial.println("OK");
-      // Optionally send acknowledgment
-      // Serial.println("# BEGIN - ready to receive images");
     }
     // Check for END command
     else if (strcmp(line, "END") == 0) {
@@ -161,8 +159,6 @@ void loop() {
         display.writeImagesToEEPROM();
         readingImages = false;
         Serial.println("OK");
-        // Optionally send acknowledgment
-        // Serial.println("# END - images written to EEPROM");
       }
     }
     // If in reading mode, parse and add image
