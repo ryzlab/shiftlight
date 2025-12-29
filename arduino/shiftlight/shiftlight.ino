@@ -8,7 +8,6 @@
 
 // Error and success message prefixes
 const char* ERROR_PREFIX = "ERR: ";
-const char* SUCCESS_PREFIX = "OK: ";
 
 const int CS_PIN = 10;   // MCP2515 CS pin
 const int INT_PIN = 2;   // MCP2515 INT pin
@@ -135,11 +134,16 @@ void loop() {
     if (strncmp(line, "rpm=", 4) == 0) {
       const char* equalsPos = strchr(line, '=');
       if (equalsPos != nullptr) {
-        // Parse the integer value (can be multi-digit, 0-9999)
+        // Parse the integer value (can be multi-digit, 0-MAX_RPM)
         int rpm = atoi(equalsPos + 1);
         // Validate range
-        if (rpm >= 0 && rpm <= 9999) {
+        if (rpm >= 0 && rpm <= MAX_RPM) {
           display.processRPM(rpm);
+          const ColorResult& colorResult = display.getColorResult();
+          for (int i = 0; i < NUM_LEDS; i++) {
+            strip.setPixelColor(i, colorResult.red[i], colorResult.green[i], colorResult.blue[i]);
+          }
+          strip.show();
         }
       }
     }
@@ -163,8 +167,6 @@ void loop() {
     else if (readingImages) {
       if (display.addImageFromString(line)) {
         Serial.println("OK");
-      } else {
-        Serial.println("ERR");
       }
     }
   }

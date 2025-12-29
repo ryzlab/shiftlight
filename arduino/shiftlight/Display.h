@@ -3,6 +3,10 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 
+// Global constants
+const int NUM_LEDS = 13;
+const int MAX_RPM = 9999;
+
 // Forward declaration or define ColorResult before the class
 struct ColorResult {
   uint8_t red[14];
@@ -26,6 +30,7 @@ class Display {
     };
 
     static const int MAX_IMAGES = 32;
+    static const int MAX_BIT_INDEX = 13;  // Maximum bit index (bits 0-13)
     static const unsigned int INVALID_BITMASK = 0xFFFF;  // Sentinel value for invalid images
     Image images[MAX_IMAGES];
     int imageCount;
@@ -44,6 +49,7 @@ class Display {
     void processRPM(int rpm);
     bool addImageFromString(const char* csvString);
     void clearImages();
+    const ColorResult& getColorResult() const;
 
 
 };

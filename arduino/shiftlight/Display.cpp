@@ -59,8 +59,8 @@ Display::Image Display::parseImageFromString(const char* csvString) {
         int rangeStart = atoi(token);
         int rangeEnd = atoi(dashPos + 1);
         
-        // Validate range values are in range (0-13)
-        if (rangeStart < 0 || rangeStart >= 14 || rangeEnd < 0 || rangeEnd >= 14) {
+        // Validate range values are in range (0-MAX_BIT_INDEX)
+        if (rangeStart < 0 || rangeStart > MAX_BIT_INDEX || rangeEnd < 0 || rangeEnd > MAX_BIT_INDEX) {
           Serial.print(ERROR_PREFIX);
           Serial.print("Invalid bitmask range: ");
           Serial.print(rangeStart);
@@ -82,9 +82,9 @@ Display::Image Display::parseImageFromString(const char* csvString) {
           img.bitmask |= (1U << i);
         }
       } else {
-        // Single value - validate it's in range (0-13)
+        // Single value - validate it's in range (0-MAX_BIT_INDEX)
         int bitIndex = atoi(token);
-        if (bitIndex < 0 || bitIndex >= 14) {
+        if (bitIndex < 0 || bitIndex > MAX_BIT_INDEX) {
           Serial.print(ERROR_PREFIX);
           Serial.print("Invalid bitmask value: ");
           Serial.println(bitIndex);
@@ -247,12 +247,12 @@ bool Display::readImagesFromEEPROM() {
 }
 
 void Display::calculateColors(int rpm, const Image& img, ColorResult& result) {
-  // Clamp RPM to 0-9999 range
+  // Clamp RPM to 0-MAX_RPM range
   if (rpm < 0) rpm = 0;
-  if (rpm > 9999) rpm = 9999;
+  if (rpm > MAX_RPM) rpm = MAX_RPM;
   
-  // Calculate proportion (0.0 to 1.0) based on RPM in 0-9999 range
-  float proportion = (float)rpm / 9999.0;
+  // Calculate proportion (0.0 to 1.0) based on RPM in 0-MAX_RPM range
+  float proportion = (float)rpm / (float)MAX_RPM;
   
   // Interpolate color values
   uint8_t calculatedRed = (uint8_t)(img.startRed + (img.endRed - img.startRed) * proportion);
@@ -262,11 +262,11 @@ void Display::calculateColors(int rpm, const Image& img, ColorResult& result) {
   // Extract blink rate from bits 14-15
   uint8_t blinkRateValue = (uint8_t)((img.bitmask >> 14) & 0x3);
   
-  // Extract bitmask (only bits 0-13, ignore bits 14-15 which are blinkrate)
+  // Extract bitmask (only bits 0-MAX_BIT_INDEX, ignore bits 14-15 which are blinkrate)
   unsigned int bitmask = img.bitmask & 0x3FFF; // Mask to get only lower 14 bits
   
   // Set color values and blink rate at indices specified by the bitmask
-  for (int i = 0; i < 14; i++) {
+  for (int i = 0; i <= MAX_BIT_INDEX; i++) {
     if (bitmask & (1U << i)) {
       result.red[i] = calculatedRed;
       result.green[i] = calculatedGreen;
@@ -278,7 +278,7 @@ void Display::calculateColors(int rpm, const Image& img, ColorResult& result) {
 
 void Display::processRPM(int rpm) {
   // Initialize all values in colorResult to 0
-  for (int i = 0; i < 14; i++) {
+  for (int i = 0; i <= MAX_BIT_INDEX; i++) {
     colorResult.red[i] = 0;
     colorResult.green[i] = 0;
     colorResult.blue[i] = 0;
@@ -304,4 +304,8 @@ bool Display::addImageFromString(const char* csvString) {
   
   // Add the image to the array
   return addImage(img);
+}
+
+const ColorResult& Display::getColorResult() const {
+  return colorResult;
 }
