@@ -128,6 +128,13 @@ void loop() {
     Serial.println(currentRpm);
   }*/
 
+  // Display the current ColorResult on the LEDs
+  const ColorResult& colorResult = display.getColorResult();
+  for (int i = 0; i < NUM_LEDS; i++) {
+    strip.setPixelColor(i, colorResult.red[i], colorResult.green[i], colorResult.blue[i]);
+  }
+  strip.show();
+
   char line[MAX_LINE_LENGTH + 1];
   if (readSerialLine(line, sizeof(line))) {
     // Check for rpm command
@@ -139,11 +146,6 @@ void loop() {
         // Validate range
         if (rpm >= 0 && rpm <= MAX_RPM) {
           display.processRPM(rpm);
-          const ColorResult& colorResult = display.getColorResult();
-          for (int i = 0; i < NUM_LEDS; i++) {
-            strip.setPixelColor(i, colorResult.red[i], colorResult.green[i], colorResult.blue[i]);
-          }
-          strip.show();
         }
       }
     }
