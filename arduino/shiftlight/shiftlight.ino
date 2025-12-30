@@ -43,6 +43,8 @@ bool readSerialLine(char* line, int lineSize) {
   if (inChar == '\n' || inChar == '\r') {
     if (discardingLine) {
       // Finished discarding the long line, reset flag
+      Serial.print(ERROR_PREFIX);
+      Serial.println("Line too long, discarded");
       discardingLine = false;
       inputIndex = 0;
       return false;
@@ -201,14 +203,14 @@ void loop() {
         }
       }
     }
-    // Check for BEGIN command
-    else if (strcmp(line, "BEGIN") == 0) {
+    // Check for BEGIN command (case-insensitive)
+    else if (strcasecmp(line, "BEGIN") == 0) {
       display.clearImages();
       readingImages = true;
       Serial.println("OK");
     }
-    // Check for END command
-    else if (strcmp(line, "END") == 0) {
+    // Check for END command (case-insensitive)
+    else if (strcasecmp(line, "END") == 0) {
       if (readingImages) {
         display.writeImagesToEEPROM();
         readingImages = false;
