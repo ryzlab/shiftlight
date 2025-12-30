@@ -243,6 +243,10 @@ bool Display::readImagesFromEEPROM() {
     address += sizeof(Image);
   }
   
+  Serial.print("# Read ");
+  Serial.print(imageCount);
+  Serial.println(" images from EEPROM");
+  
   return true; // Successfully read
 }
 
