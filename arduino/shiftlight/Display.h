@@ -44,7 +44,7 @@ class Display {
 
   public:
     Display(Adafruit_NeoPixel* strip);
-    void writeImagesToEEPROM();
+    int writeImagesToEEPROM();
     bool readImagesFromEEPROM();
     void processRPM(int rpm);
     bool addImageFromString(const char* csvString);

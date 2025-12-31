@@ -200,7 +200,18 @@ void loop() {
         // Validate range
         if (rpm >= 0 && rpm <= MAX_RPM) {
           display.processRPM(rpm);
+          Serial.println("OK");
+        } else {
+          Serial.print(ERROR_PREFIX);
+          Serial.print("RPM out of range: ");
+          Serial.print(rpm);
+          Serial.print(" (valid range: 0-");
+          Serial.print(MAX_RPM);
+          Serial.println(")");
         }
+      } else {
+        Serial.print(ERROR_PREFIX);
+        Serial.println("Invalid RPM command format");
       }
     }
     // Check for BEGIN command (case-insensitive)
@@ -212,9 +223,12 @@ void loop() {
     // Check for END command (case-insensitive)
     else if (strcasecmp(line, "END") == 0) {
       if (readingImages) {
-        display.writeImagesToEEPROM();
+        int imagesWritten = display.writeImagesToEEPROM();
         readingImages = false;
-        Serial.println("OK");
+        Serial.print("OK");
+        Serial.print(" wrote ");
+        Serial.print(imagesWritten);
+        Serial.println(" rows");
       }
     }
     // If in reading mode, parse and add image

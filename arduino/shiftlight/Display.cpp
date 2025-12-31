@@ -208,7 +208,7 @@ bool Display::addImage(const Image& img) {
   return true; // Successfully added
 }
 
-void Display::writeImagesToEEPROM() {
+int Display::writeImagesToEEPROM() {
   int address = 0;
   
   // Write the image count first
@@ -220,6 +220,8 @@ void Display::writeImagesToEEPROM() {
     EEPROM.put(address, images[i]);
     address += sizeof(Image);
   }
+  
+  return imageCount;
 }
 
 bool Display::readImagesFromEEPROM() {
@@ -251,12 +253,18 @@ bool Display::readImagesFromEEPROM() {
 }
 
 void Display::calculateColors(int rpm, const Image& img, ColorResult& result) {
-  // Clamp RPM to 0-MAX_RPM range
-  if (rpm < 0) rpm = 0;
-  if (rpm > MAX_RPM) rpm = MAX_RPM;
+  // Clamp RPM to the image's RPM range
+  if (rpm < img.startRPM) rpm = img.startRPM;
+  if (rpm > img.endRPM) rpm = img.endRPM;
   
-  // Calculate proportion (0.0 to 1.0) based on RPM in 0-MAX_RPM range
-  float proportion = (float)rpm / (float)MAX_RPM;
+  // Calculate proportion (0.0 to 1.0) based on RPM between startRPM and endRPM
+  float proportion = 0.0;
+  if (img.endRPM != img.startRPM) {
+    proportion = (float)(rpm - img.startRPM) / (float)(img.endRPM - img.startRPM);
+  } else {
+    // If startRPM == endRPM, use proportion 1.0 (end color)
+    proportion = 1.0;
+  }
   
   // Interpolate color values
   uint8_t calculatedRed = (uint8_t)(img.startRed + (img.endRed - img.startRed) * proportion);
