@@ -321,3 +321,96 @@ bool Display::addImageFromString(const char* csvString) {
 const ColorResult& Display::getColorResult() const {
   return colorResult;
 }
+
+void Display::printAllImages() const {
+  for (int i = 0; i < imageCount; i++) {
+    const Image& img = images[i];
+    
+    // Extract bitmask (only bits 0-MAX_BIT_INDEX, ignore bits 14-15 which are blinkrate)
+    unsigned int bitmask = img.bitmask & 0x3FFF; // Mask to get only lower 14 bits
+    
+    // Extract all bit indices that are set
+    int bitIndices[MAX_BIT_INDEX + 1];
+    int bitCount = 0;
+    for (int j = 0; j <= MAX_BIT_INDEX; j++) {
+      if (bitmask & (1U << j)) {
+        bitIndices[bitCount++] = j;
+      }
+    }
+    
+    // Format bitmask with ranges
+    Serial.print("[");
+    if (bitCount > 0) {
+      int rangeStart = bitIndices[0];
+      int rangeEnd = bitIndices[0];
+      bool firstOutput = true;
+      
+      for (int j = 1; j < bitCount; j++) {
+        if (bitIndices[j] == rangeEnd + 1) {
+          // Consecutive, extend range
+          rangeEnd = bitIndices[j];
+        } else {
+          // Not consecutive, output current range/point
+          if (!firstOutput) Serial.print(",");
+          firstOutput = false;
+          
+          if (rangeStart == rangeEnd) {
+            // Single value
+            Serial.print(rangeStart);
+          } else if (rangeEnd == rangeStart + 1) {
+            // Two consecutive values, output separately
+            Serial.print(rangeStart);
+            Serial.print(",");
+            Serial.print(rangeEnd);
+          } else {
+            // Range of 2+ consecutive values
+            Serial.print(rangeStart);
+            Serial.print("-");
+            Serial.print(rangeEnd);
+          }
+          // Start new range
+          rangeStart = bitIndices[j];
+          rangeEnd = bitIndices[j];
+        }
+      }
+      
+      // Output the last range/point
+      if (!firstOutput) Serial.print(",");
+      if (rangeStart == rangeEnd) {
+        Serial.print(rangeStart);
+      } else if (rangeEnd == rangeStart + 1) {
+        Serial.print(rangeStart);
+        Serial.print(",");
+        Serial.print(rangeEnd);
+      } else {
+        Serial.print(rangeStart);
+        Serial.print("-");
+        Serial.print(rangeEnd);
+      }
+    }
+    Serial.print("]");
+    
+    // Extract blink rate from bits 14-15
+    uint8_t blinkRateValue = (uint8_t)((img.bitmask >> 14) & 0x3);
+    
+    // Output the rest of the CSV values
+    Serial.print(",");
+    Serial.print(img.startRPM);
+    Serial.print(",");
+    Serial.print(img.endRPM);
+    Serial.print(",");
+    Serial.print(img.startRed);
+    Serial.print(",");
+    Serial.print(img.startGreen);
+    Serial.print(",");
+    Serial.print(img.startBlue);
+    Serial.print(",");
+    Serial.print(img.endRed);
+    Serial.print(",");
+    Serial.print(img.endGreen);
+    Serial.print(",");
+    Serial.print(img.endBlue);
+    Serial.print(",");
+    Serial.println(blinkRateValue);
+  }
+}

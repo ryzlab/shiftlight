@@ -231,6 +231,13 @@ void loop() {
         Serial.println(" rows");
       }
     }
+    // Check for LIST command (case-insensitive)
+    else if (strcasecmp(line, "LIST") == 0) {
+      Serial.println("BEGIN");
+      display.printAllImages();
+      Serial.println("END");
+      Serial.println("OK");
+    }
     // If in reading mode, parse and add image
     else if (readingImages) {
       if (display.addImageFromString(line)) {

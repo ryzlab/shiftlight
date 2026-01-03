@@ -50,6 +50,7 @@ class Display {
     bool addImageFromString(const char* csvString);
     void clearImages();
     const ColorResult& getColorResult() const;
+    void printAllImages() const;
 
 
 };
