@@ -68,8 +68,8 @@ public class Shiftlight {
         programButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // TODO: Implement program functionality
-                JOptionPane.showMessageDialog(frame, "Program functionality not yet implemented");
+                String programOutput = animation.generateProgramOutput();
+                System.out.println(programOutput);
             }
         });
         
