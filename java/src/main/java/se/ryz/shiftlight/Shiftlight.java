@@ -9,6 +9,7 @@ import java.io.File;
 public class Shiftlight {
     private static Animation animation;
     private static AnimationPanel animationPanel;
+    private static JButton saveButton;
 
     public static void main(String[] args) {
         // Initialize the animation model
@@ -32,12 +33,24 @@ public class Shiftlight {
         // Create button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         
-        JButton saveButton = new JButton("Save");
+        saveButton = new JButton("Save");
+        saveButton.setToolTipText("All rows must have valid CSV before saving");
         saveButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 saveToFile();
             }
+        });
+        
+        // Listen to validity changes from animation panel
+        animationPanel.addPropertyChangeListener("allRowsValid", evt -> {
+            boolean allValid = (Boolean) evt.getNewValue();
+            saveButton.setEnabled(allValid);
+        });
+        
+        // Set initial state (after panel is fully initialized)
+        SwingUtilities.invokeLater(() -> {
+            saveButton.setEnabled(animationPanel.areAllRowsValid());
         });
         
         JButton programButton = new JButton("Program");

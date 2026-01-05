@@ -13,6 +13,7 @@ public class ImageRowPanel extends JPanel {
     private Color endColor;
     private Image currentImage;
     private Runnable onRemoveCallback;
+    private Runnable onValidityChangedCallback;
 
     public ImageRowPanel() {
         this.startColor = Color.BLACK;
@@ -116,6 +117,14 @@ public class ImageRowPanel extends JPanel {
     private void updateColorsFromCsv() {
         String csvLine = csvTextField.getText().trim();
         if (csvLine.isEmpty()) {
+            currentImage = null;
+            // Clear error indication for empty CSV
+            csvTextField.setToolTipText(null);
+            csvTextField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.GRAY),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+            ));
+            notifyValidityChanged();
             return;
         }
 
@@ -143,6 +152,7 @@ public class ImageRowPanel extends JPanel {
                 BorderFactory.createLineBorder(Color.GRAY),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
             ));
+            notifyValidityChanged();
         } catch (IllegalArgumentException e) {
             // Invalid CSV, print error message
             System.err.println("Invalid CSV: " + csvLine);
@@ -153,6 +163,7 @@ public class ImageRowPanel extends JPanel {
                 BorderFactory.createLineBorder(Color.RED, 2),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
             ));
+            notifyValidityChanged();
         }
     }
 
@@ -258,5 +269,27 @@ public class ImageRowPanel extends JPanel {
     public void addCsvDocumentListener(javax.swing.event.DocumentListener listener) {
         csvTextField.getDocument().addDocumentListener(listener);
     }
-}
 
+    public boolean isCsvValid() {
+        String csvLine = csvTextField.getText().trim();
+        if (csvLine.isEmpty()) {
+            return true; // Empty is considered valid (not invalid)
+        }
+        try {
+            new Image(csvLine);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public void setOnValidityChangedCallback(Runnable callback) {
+        this.onValidityChangedCallback = callback;
+    }
+
+    private void notifyValidityChanged() {
+        if (onValidityChangedCallback != null) {
+            onValidityChangedCallback.run();
+        }
+    }
+}

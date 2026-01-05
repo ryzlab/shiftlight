@@ -10,6 +10,7 @@ public class AnimationPanel extends JPanel {
     private JPanel imageRowsPanel;
     private Animation animation;
     private final List<ImageRowPanel> imageRowPanels;
+    private JButton addRowButton;
 
     public AnimationPanel(Animation animation) {
         this.animation = animation;
@@ -50,8 +51,10 @@ public class AnimationPanel extends JPanel {
         imageRowsScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         imageRowsScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         
-        JButton addRowButton = new JButton("Add Image Row");
+        addRowButton = new JButton("Add Image Row");
+        addRowButton.setToolTipText("All rows must have valid CSV before adding a new row");
         addRowButton.addActionListener(e -> addImageRow());
+        updateButtonStates();
         
         JPanel bottomHeaderPanel = new JPanel(new BorderLayout());
         bottomHeaderPanel.add(animationLabel, BorderLayout.WEST);
@@ -96,6 +99,23 @@ public class AnimationPanel extends JPanel {
             rowPanel.setOnRemoveCallback(() -> {
                 animation.remove(imageRef);
             });
+            rowPanel.setOnValidityChangedCallback(() -> updateButtonStates());
+            rowPanel.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
+                @Override
+                public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                    updateButtonStates();
+                }
+
+                @Override
+                public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                    updateButtonStates();
+                }
+
+                @Override
+                public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                    updateButtonStates();
+                }
+            });
             imageRowPanels.add(rowPanel);
             imageRowsPanel.add(rowPanel);
         }
@@ -106,13 +126,32 @@ public class AnimationPanel extends JPanel {
             if (imageRowPanels.contains(emptyRow)) {
                 imageRowsPanel.remove(emptyRow);
                 imageRowPanels.remove(emptyRow);
+                updateButtonStates();
                 revalidate();
                 repaint();
+            }
+        });
+        emptyRow.setOnValidityChangedCallback(() -> updateButtonStates());
+        emptyRow.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
             }
         });
         imageRowPanels.add(emptyRow);
         imageRowsPanel.add(emptyRow);
 
+        updateButtonStates();
         revalidate();
         repaint();
     }
@@ -122,13 +161,62 @@ public class AnimationPanel extends JPanel {
         newRow.setOnRemoveCallback(() -> {
             imageRowsPanel.remove(newRow);
             imageRowPanels.remove(newRow);
+            updateButtonStates();
             revalidate();
             repaint();
         });
+        newRow.setOnValidityChangedCallback(() -> updateButtonStates());
+        newRow.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+        });
         imageRowPanels.add(newRow);
         imageRowsPanel.add(newRow);
+        updateButtonStates();
         revalidate();
         repaint();
+    }
+
+    public boolean areAllRowsValid() {
+        if (imageRowPanels.isEmpty()) {
+            return false;
+        }
+        
+        boolean hasNonEmptyValidRow = false;
+        for (ImageRowPanel rowPanel : imageRowPanels) {
+            String csvLine = rowPanel.getCsvLine();
+            if (!csvLine.isEmpty()) {
+                // Non-empty row must be valid
+                if (!rowPanel.isCsvValid()) {
+                    return false;
+                }
+                hasNonEmptyValidRow = true;
+            }
+        }
+        
+        // At least one non-empty valid row is required, or all rows must be empty (which is invalid)
+        return hasNonEmptyValidRow;
+    }
+
+    public void updateButtonStates() {
+        boolean allValid = areAllRowsValid();
+        if (addRowButton != null) {
+            addRowButton.setEnabled(allValid);
+        }
+        // Notify parent to update save button
+        firePropertyChange("allRowsValid", !allValid, allValid);
     }
 
     public String getVariablesText() {
