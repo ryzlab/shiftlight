@@ -8,11 +8,13 @@ import java.io.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import com.fazecast.jSerialComm.SerialPort;
 
 public class Shiftlight {
     private static Animation animation;
     private static AnimationPanel animationPanel;
     private static JButton saveButton;
+    private static SerialPortComboBox serialPortComboBox;
 
     public static void main(String[] args) {
         // Initialize the animation model
@@ -35,6 +37,12 @@ public class Shiftlight {
 
         // Create button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        
+        // Add serial port combo box
+        JLabel serialPortLabel = new JLabel("Serial Port:");
+        serialPortComboBox = new SerialPortComboBox();
+        buttonPanel.add(serialPortLabel);
+        buttonPanel.add(serialPortComboBox);
         
         JButton loadButton = new JButton("Load");
         loadButton.addActionListener(new ActionListener() {
@@ -68,8 +76,7 @@ public class Shiftlight {
         programButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String programOutput = animationPanel.generateProgramOutput();
-                System.out.println(programOutput);
+                programToShiftlight(frame);
             }
         });
         
@@ -207,6 +214,134 @@ public class Shiftlight {
                 "Load Error", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
         }
+    }
+
+    private static void programToShiftlight(JFrame parentFrame) {
+        String selectedPort = serialPortComboBox.getSelectedPortName();
+        if (selectedPort == null || selectedPort.isEmpty()) {
+            JOptionPane.showMessageDialog(parentFrame, 
+                "Please select a serial port", 
+                "No Port Selected", 
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        System.out.println("Selected Serial Port: " + selectedPort);
+        
+        SerialPort port = SerialPort.getCommPort(selectedPort);
+        if (port == null) {
+            JOptionPane.showMessageDialog(parentFrame, 
+                "Serial port not found: " + selectedPort, 
+                "Port Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            // Open port with 9600 baud
+            port.setBaudRate(9600);
+            if (!port.openPort()) {
+                JOptionPane.showMessageDialog(parentFrame, 
+                    "Failed to open serial port: " + selectedPort, 
+                    "Port Error", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Give the port time to initialize
+            Thread.sleep(100);
+
+            // Send HELLO and wait for OK
+            System.out.println("Sending HELLO...");
+            port.getOutputStream().write("HELLO\n".getBytes());
+            port.getOutputStream().flush();
+
+            // Wait for response with timeout
+            String response = readResponse(port, 2000); // 2 second timeout
+            if (!response.trim().equals("OK")) {
+                port.closePort();
+                JOptionPane.showMessageDialog(parentFrame, 
+                    "No shiftlight connected to port " + selectedPort + ".\n" +
+                    "Expected 'OK' but received: " + (response.isEmpty() ? "(no response)" : response), 
+                    "Connection Failed", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            System.out.println("Received OK, shiftlight connected");
+
+            // Get program output
+            String programOutput = animationPanel.generateProgramOutput();
+            System.out.println(programOutput);
+
+            // Send program output line by line
+            String[] lines = programOutput.split("\n");
+            for (String line : lines) {
+                if (line.trim().isEmpty()) {
+                    continue; // Skip empty lines
+                }
+                
+                System.out.println("Sending: " + line);
+                port.getOutputStream().write((line + "\n").getBytes());
+                port.getOutputStream().flush();
+
+                // Wait for OK response
+                response = readResponse(port, 2000); // 2 second timeout
+                if (!response.trim().equals("OK")) {
+                    port.closePort();
+                    JOptionPane.showMessageDialog(parentFrame, 
+                        "Programming failed: No response from shiftlight.\n" +
+                        "Last line sent: " + line + "\n" +
+                        "Expected 'OK' but received: " + (response.isEmpty() ? "(no response)" : response), 
+                        "Programming Failed", 
+                        JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                System.out.println("Received OK for line: " + line);
+            }
+
+            port.closePort();
+            JOptionPane.showMessageDialog(parentFrame, 
+                "Programming completed successfully!", 
+                "Success", 
+                JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (Exception e) {
+            if (port.isOpen()) {
+                port.closePort();
+            }
+            JOptionPane.showMessageDialog(parentFrame, 
+                "Error during programming: " + e.getMessage(), 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+    }
+
+    private static String readResponse(SerialPort port, int timeoutMs) {
+        StringBuilder response = new StringBuilder();
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (port.bytesAvailable() > 0) {
+                    byte[] buffer = new byte[port.bytesAvailable()];
+                    int bytesRead = port.readBytes(buffer, buffer.length);
+                    if (bytesRead > 0) {
+                        response.append(new String(buffer, 0, bytesRead));
+                        // Check if we have a complete line (ends with newline)
+                        if (response.toString().contains("\n")) {
+                            break;
+                        }
+                    }
+                }
+                Thread.sleep(10); // Small delay to avoid busy waiting
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        return response.toString();
     }
 }
 
