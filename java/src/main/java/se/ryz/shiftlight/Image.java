@@ -64,7 +64,51 @@ public class Image {
         endRed = Integer.parseInt(parts[5].trim());
         endGreen = Integer.parseInt(parts[6].trim());
         endBlue = Integer.parseInt(parts[7].trim());
-        blinkMode = parts[8].trim();
+        
+        // Validate RPM values (range 0-9999)
+        if (startRPM < 0 || startRPM > 9999) {
+            throw new IllegalArgumentException("Start RPM must be in range 0-9999, got: " + startRPM);
+        }
+        if (endRPM < 0 || endRPM > 9999) {
+            throw new IllegalArgumentException("End RPM must be in range 0-9999, got: " + endRPM);
+        }
+        
+        // Validate startRPM <= endRPM
+        if (startRPM > endRPM) {
+            throw new IllegalArgumentException("Start RPM (" + startRPM + ") must be less than or equal to End RPM (" + endRPM + ")");
+        }
+        
+        // Validate RGB values (range 0-255)
+        if (startRed < 0 || startRed > 255) {
+            throw new IllegalArgumentException("Start Red must be in range 0-255, got: " + startRed);
+        }
+        if (startGreen < 0 || startGreen > 255) {
+            throw new IllegalArgumentException("Start Green must be in range 0-255, got: " + startGreen);
+        }
+        if (startBlue < 0 || startBlue > 255) {
+            throw new IllegalArgumentException("Start Blue must be in range 0-255, got: " + startBlue);
+        }
+        if (endRed < 0 || endRed > 255) {
+            throw new IllegalArgumentException("End Red must be in range 0-255, got: " + endRed);
+        }
+        if (endGreen < 0 || endGreen > 255) {
+            throw new IllegalArgumentException("End Green must be in range 0-255, got: " + endGreen);
+        }
+        if (endBlue < 0 || endBlue > 255) {
+            throw new IllegalArgumentException("End Blue must be in range 0-255, got: " + endBlue);
+        }
+        
+        // Validate blinkMode (last value) is in range 0-2
+        String blinkModeStr = parts[8].trim();
+        try {
+            int blinkModeValue = Integer.parseInt(blinkModeStr);
+            if (blinkModeValue < 0 || blinkModeValue > 2) {
+                throw new IllegalArgumentException("Blink mode must be in range 0-2, got: " + blinkModeValue);
+            }
+            blinkMode = blinkModeStr;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Blink mode must be a number in range 0-2, got: " + blinkModeStr);
+        }
     }
 
     private List<Integer> parseLedIndices(String ledString) {
