@@ -289,6 +289,29 @@ public class AnimationPanel extends JPanel {
         variablesTextArea.setText(text);
     }
 
+    public String generateProgramOutput() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("BEGIN\n");
+        
+        // Get all valid CSV lines from UI rows and evaluate them
+        for (ImageRowPanel rowPanel : imageRowPanels) {
+            String csvLine = rowPanel.getCsvLine();
+            if (!csvLine.isEmpty() && rowPanel.isCsvValid()) {
+                try {
+                    // Evaluate the CSV line with variables to get the final values
+                    Image image = variableParser != null ? new Image(csvLine, variableParser) : new Image(csvLine);
+                    sb.append(image.toCsvLine()).append("\n");
+                } catch (IllegalArgumentException e) {
+                    // Skip invalid lines
+                    System.err.println("Skipping invalid CSV line in program output: " + csvLine);
+                }
+            }
+        }
+        
+        sb.append("END");
+        return sb.toString();
+    }
+
     public List<String> getAllCsvLines() {
         List<String> csvLines = new ArrayList<>();
         // Get CSV lines from UI rows (filter out empty and invalid rows)

@@ -68,7 +68,7 @@ public class Shiftlight {
         programButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String programOutput = animation.generateProgramOutput();
+                String programOutput = animationPanel.generateProgramOutput();
                 System.out.println(programOutput);
             }
         });

@@ -238,6 +238,10 @@ void loop() {
       Serial.println("END");
       Serial.println("OK");
     }
+    // Check if line contains HELLO (case-insensitive)
+    else if (strcasestr(line, "HELLO") != nullptr) {
+      Serial.println("OK");
+    }
     // If in reading mode, parse and add image
     else if (readingImages) {
       if (display.addImageFromString(line)) {
