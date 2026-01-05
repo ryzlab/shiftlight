@@ -91,11 +91,10 @@ public class AnimationPanel extends JPanel {
         for (Image image : images) {
             ImageRowPanel rowPanel = new ImageRowPanel();
             rowPanel.setCsvLine(image.toCsvLine());
+            // Store reference to the image for reliable removal
+            final Image imageRef = image;
             rowPanel.setOnRemoveCallback(() -> {
-                String csvLine = rowPanel.getCsvLine();
-                if (!csvLine.isEmpty()) {
-                    animation.remove(csvLine);
-                }
+                animation.remove(imageRef);
             });
             imageRowPanels.add(rowPanel);
             imageRowsPanel.add(rowPanel);

@@ -61,6 +61,30 @@ public class Animation {
     }
 
     /**
+     * Removes an Image from the Animation by reference.
+     * Emits an IMAGE_REMOVED event to all registered listeners if an image was removed.
+     * 
+     * @param imageToRemove the Image to remove
+     * @return true if an Image was removed, false otherwise
+     */
+    public boolean remove(Image imageToRemove) {
+        Iterator<Image> iterator = images.iterator();
+        int index = 0;
+        
+        while (iterator.hasNext()) {
+            Image image = iterator.next();
+            if (image == imageToRemove || image.equals(imageToRemove)) {
+                iterator.remove();
+                fireAnimationEvent(new AnimationEvent(this, AnimationEvent.EventType.IMAGE_REMOVED, image, index));
+                return true;
+            }
+            index++;
+        }
+        
+        return false;
+    }
+
+    /**
      * Clears all Images from the Animation.
      * Emits an ANIMATION_CLEARED event to all registered listeners.
      */
