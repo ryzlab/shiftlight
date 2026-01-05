@@ -25,6 +25,8 @@ public class ImageRowPanel extends JPanel {
 
     public void setVariableParser(VariableParser variableParser) {
         this.variableParser = variableParser;
+        // Update tooltip when variable parser changes
+        updateTooltip();
     }
 
     private void initializeComponents() {
@@ -153,11 +155,12 @@ public class ImageRowPanel extends JPanel {
             startColorButton.setBackground(startColor);
             endColorButton.setBackground(endColor);
             // Clear any error indication on successful parse
-            csvTextField.setToolTipText(null);
             csvTextField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
             ));
+            // Update tooltip with evaluated CSV
+            updateTooltip();
             notifyValidityChanged();
         } catch (IllegalArgumentException e) {
             // Invalid CSV, print error message
@@ -170,6 +173,29 @@ public class ImageRowPanel extends JPanel {
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
             ));
             notifyValidityChanged();
+        }
+    }
+
+    private void updateTooltip() {
+        String csvLine = csvTextField.getText().trim();
+        if (csvLine.isEmpty()) {
+            csvTextField.setToolTipText(null);
+            return;
+        }
+
+        try {
+            // Generate evaluated CSV by creating an Image and converting it back
+            Image evaluatedImage = variableParser != null ? new Image(csvLine, variableParser) : new Image(csvLine);
+            String evaluatedCsv = evaluatedImage.toCsvLine();
+            
+            // Only show tooltip if it's different from the original (i.e., has variables)
+            if (!evaluatedCsv.equals(csvLine)) {
+                csvTextField.setToolTipText("Evaluated: " + evaluatedCsv);
+            } else {
+                csvTextField.setToolTipText(null);
+            }
+        } catch (IllegalArgumentException e) {
+            // Invalid CSV, tooltip will be set by error handling
         }
     }
 
