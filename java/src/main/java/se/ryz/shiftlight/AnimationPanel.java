@@ -12,11 +12,13 @@ public class AnimationPanel extends JPanel {
     private final List<ImageRowPanel> imageRowPanels;
     private JButton addRowButton;
     private VariableParser variableParser;
+    private final java.util.Map<Image, String> imageToOriginalCsv;
 
     public AnimationPanel(Animation animation) {
         this.animation = animation;
         this.imageRowPanels = new ArrayList<>();
         this.variableParser = new VariableParser();
+        this.imageToOriginalCsv = new java.util.HashMap<>();
         initializeComponents();
         setupAnimationListener();
         setupVariablesListener();
@@ -136,7 +138,9 @@ public class AnimationPanel extends JPanel {
             Image image = images.get(i);
             ImageRowPanel rowPanel = new ImageRowPanel();
             rowPanel.setVariableParser(variableParser);
-            rowPanel.setCsvLine(image.toCsvLine());
+            // Use original CSV if available, otherwise use evaluated CSV
+            String csvLine = imageToOriginalCsv.getOrDefault(image, image.toCsvLine());
+            rowPanel.setCsvLine(csvLine);
             // Store reference to the image for reliable removal
             final Image imageRef = image;
             final int imageIndex = i;
@@ -267,10 +271,13 @@ public class AnimationPanel extends JPanel {
 
     public void updateButtonStates() {
         boolean allValid = areAllRowsValid();
+        boolean isEmpty = imageRowPanels.isEmpty() || (imageRowPanels.size() == 1 && imageRowPanels.get(0).getCsvLine().isEmpty());
+        
         if (addRowButton != null) {
-            addRowButton.setEnabled(allValid);
+            // Enable "Add image row" button if all rows are valid OR if there are no rows
+            addRowButton.setEnabled(allValid || isEmpty);
         }
-        // Notify parent to update save button
+        // Notify parent to update save button (save still requires at least one valid row)
         firePropertyChange("allRowsValid", !allValid, allValid);
     }
 
@@ -280,6 +287,83 @@ public class AnimationPanel extends JPanel {
 
     public void setVariablesText(String text) {
         variablesTextArea.setText(text);
+    }
+
+    public List<String> getAllCsvLines() {
+        List<String> csvLines = new ArrayList<>();
+        // Get CSV lines from UI rows (filter out empty and invalid rows)
+        for (ImageRowPanel rowPanel : imageRowPanels) {
+            String csvLine = rowPanel.getCsvLine();
+            if (!csvLine.isEmpty() && rowPanel.isCsvValid()) {
+                csvLines.add(csvLine);
+            }
+        }
+        return csvLines;
+    }
+
+    public void loadFromFile(List<String> variables, List<String> csvLines) {
+        // Clear current animation and original CSV map
+        animation.clear();
+        imageToOriginalCsv.clear();
+        
+        // Set variables and parse them
+        String variablesText = String.join("\n", variables);
+        setVariablesText(variablesText);
+        try {
+            variableParser.parseVariables(variablesText);
+        } catch (IllegalArgumentException e) {
+            System.err.println("Warning: Some variables may be invalid: " + e.getMessage());
+        }
+        
+        // Temporarily disable animation listener to prevent refresh during loading
+        // We'll manually refresh at the end with original CSV preserved
+        
+        // Add all CSV lines to animation (filter out empty lines)
+        // Store original CSV lines before evaluation
+        List<String> originalCsvLines = new ArrayList<>();
+        for (String csvLine : csvLines) {
+            if (csvLine == null) {
+                continue;
+            }
+            String trimmed = csvLine.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                // Store original CSV before adding (which will evaluate it)
+                originalCsvLines.add(trimmed);
+                animation.add(trimmed, variableParser);
+            } catch (IllegalArgumentException e) {
+                // Skip invalid lines
+                System.err.println("Skipping invalid CSV line: " + csvLine);
+            }
+        }
+        
+        // Now map the original CSV lines to the images
+        List<Image> images = animation.getImages();
+        for (int i = 0; i < Math.min(images.size(), originalCsvLines.size()); i++) {
+            imageToOriginalCsv.put(images.get(i), originalCsvLines.get(i));
+        }
+        
+        // refreshImageRows will be called automatically by the animation listener
+        // Remove the empty row that refreshImageRows adds
+        SwingUtilities.invokeLater(() -> {
+            removeEmptyRowIfPresent();
+        });
+    }
+
+    private void removeEmptyRowIfPresent() {
+        // Find and remove the empty row (the last row if it's empty)
+        if (!imageRowPanels.isEmpty()) {
+            ImageRowPanel lastRow = imageRowPanels.get(imageRowPanels.size() - 1);
+            String csvLine = lastRow.getCsvLine();
+            if (csvLine.isEmpty()) {
+                imageRowsPanel.remove(lastRow);
+                imageRowPanels.remove(lastRow);
+                revalidate();
+                repaint();
+            }
+        }
     }
 
     private void duplicateRow(ImageRowPanel sourceRow, int imageIndex) {
