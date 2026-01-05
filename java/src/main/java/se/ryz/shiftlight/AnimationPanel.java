@@ -110,45 +110,11 @@ public class AnimationPanel extends JPanel {
                 repaint();
             }
         });
-        emptyRow.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
-            @Override
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                checkAndAddImage(emptyRow);
-            }
-
-            @Override
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                // Do nothing
-            }
-
-            @Override
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                checkAndAddImage(emptyRow);
-            }
-        });
         imageRowPanels.add(emptyRow);
         imageRowsPanel.add(emptyRow);
 
         revalidate();
         repaint();
-    }
-
-    private void checkAndAddImage(ImageRowPanel rowPanel) {
-        String csvLine = rowPanel.getCsvLine();
-        if (!csvLine.isEmpty()) {
-            try {
-                // Validate the CSV by creating an Image
-                new Image(csvLine);
-                
-                // If validation succeeds and image doesn't exist, add it
-                Image image = rowPanel.getImage();
-                if (image != null && !animation.getImages().contains(image)) {
-                    animation.add(csvLine);
-                }
-            } catch (IllegalArgumentException e) {
-                // Invalid CSV, ignore
-            }
-        }
     }
 
     private void addImageRow() {

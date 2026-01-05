@@ -75,6 +75,21 @@ public class ImageRowPanel extends JPanel {
         endColorButton.setBorderPainted(true);
         endColorButton.addActionListener(e -> pickEndColor());
 
+        // Arrow buttons to copy colors
+        JButton leftArrowButton = new JButton("←");
+        leftArrowButton.setPreferredSize(new Dimension(30, 30));
+        leftArrowButton.setMaximumSize(new Dimension(30, 30));
+        leftArrowButton.setAlignmentY(Component.CENTER_ALIGNMENT);
+        leftArrowButton.setToolTipText("Copy End RGB to Start RGB");
+        leftArrowButton.addActionListener(e -> copyEndToStart());
+
+        JButton rightArrowButton = new JButton("→");
+        rightArrowButton.setPreferredSize(new Dimension(30, 30));
+        rightArrowButton.setMaximumSize(new Dimension(30, 30));
+        rightArrowButton.setAlignmentY(Component.CENTER_ALIGNMENT);
+        rightArrowButton.setToolTipText("Copy Start RGB to End RGB");
+        rightArrowButton.addActionListener(e -> copyStartToEnd());
+
         JButton removeButton = new JButton("Remove");
         removeButton.setAlignmentY(Component.CENTER_ALIGNMENT);
         removeButton.addActionListener(e -> {
@@ -85,6 +100,10 @@ public class ImageRowPanel extends JPanel {
 
         colorPanel.add(Box.createHorizontalStrut(5));
         colorPanel.add(startColorButton);
+        colorPanel.add(Box.createHorizontalStrut(5));
+        colorPanel.add(leftArrowButton);
+        colorPanel.add(Box.createHorizontalStrut(2));
+        colorPanel.add(rightArrowButton);
         colorPanel.add(Box.createHorizontalStrut(5));
         colorPanel.add(endColorButton);
         colorPanel.add(Box.createHorizontalStrut(5));
@@ -153,6 +172,18 @@ public class ImageRowPanel extends JPanel {
             endColorButton.setBackground(endColor);
             updateCsvFromColors();
         }
+    }
+
+    private void copyStartToEnd() {
+        endColor = new Color(startColor.getRed(), startColor.getGreen(), startColor.getBlue());
+        endColorButton.setBackground(endColor);
+        updateCsvFromColors();
+    }
+
+    private void copyEndToStart() {
+        startColor = new Color(endColor.getRed(), endColor.getGreen(), endColor.getBlue());
+        startColorButton.setBackground(startColor);
+        updateCsvFromColors();
     }
 
     private void updateCsvFromColors() {
