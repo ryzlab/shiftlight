@@ -25,11 +25,15 @@ public class Animation {
      * @throws IllegalArgumentException if maximum images reached or CSV parsing fails
      */
     public void add(String csvLine) {
+        add(csvLine, null);
+    }
+
+    public void add(String csvLine, VariableParser variableParser) {
         if (images.size() >= MAX_IMAGES) {
             throw new IllegalArgumentException("Maximum number of images (" + MAX_IMAGES + ") reached");
         }
         
-        Image image = new Image(csvLine);
+        Image image = variableParser != null ? new Image(csvLine, variableParser) : new Image(csvLine);
         int index = images.size();
         images.add(image);
         fireAnimationEvent(new AnimationEvent(this, AnimationEvent.EventType.IMAGE_ADDED, image, index));

@@ -11,12 +11,15 @@ public class AnimationPanel extends JPanel {
     private Animation animation;
     private final List<ImageRowPanel> imageRowPanels;
     private JButton addRowButton;
+    private VariableParser variableParser;
 
     public AnimationPanel(Animation animation) {
         this.animation = animation;
         this.imageRowPanels = new ArrayList<>();
+        this.variableParser = new VariableParser();
         initializeComponents();
         setupAnimationListener();
+        setupVariablesListener();
         refreshImageRows();
     }
 
@@ -32,6 +35,22 @@ public class AnimationPanel extends JPanel {
         variablesTextArea = new JTextArea(5, 40);
         variablesTextArea.setLineWrap(true);
         variablesTextArea.setWrapStyleWord(true);
+        variablesTextArea.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                updateVariables();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                updateVariables();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                updateVariables();
+            }
+        });
         JScrollPane variablesScrollPane = new JScrollPane(variablesTextArea);
         variablesScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         variablesScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -86,6 +105,27 @@ public class AnimationPanel extends JPanel {
         });
     }
 
+    private void setupVariablesListener() {
+        // Variables are updated via document listener on variablesTextArea
+    }
+
+    private void updateVariables() {
+        try {
+            variableParser.parseVariables(variablesTextArea.getText());
+            // Variables parsed successfully, update button states
+            updateButtonStates();
+            // Re-validate all rows to check if they're still valid with new variables
+            for (ImageRowPanel rowPanel : imageRowPanels) {
+                rowPanel.setVariableParser(variableParser);
+            }
+            updateButtonStates();
+        } catch (IllegalArgumentException e) {
+            // Invalid variables, but don't prevent UI from working
+            // Just keep current variables or empty
+            System.err.println("Invalid variables: " + e.getMessage());
+        }
+    }
+
     private void refreshImageRows() {
         imageRowsPanel.removeAll();
         imageRowPanels.clear();
@@ -93,6 +133,7 @@ public class AnimationPanel extends JPanel {
         List<Image> images = animation.getImages();
         for (Image image : images) {
             ImageRowPanel rowPanel = new ImageRowPanel();
+            rowPanel.setVariableParser(variableParser);
             rowPanel.setCsvLine(image.toCsvLine());
             // Store reference to the image for reliable removal
             final Image imageRef = image;
@@ -122,6 +163,7 @@ public class AnimationPanel extends JPanel {
 
         // Add an empty row at the end for adding new images
         ImageRowPanel emptyRow = new ImageRowPanel();
+        emptyRow.setVariableParser(variableParser);
         emptyRow.setOnRemoveCallback(() -> {
             if (imageRowPanels.contains(emptyRow)) {
                 imageRowsPanel.remove(emptyRow);
@@ -158,6 +200,7 @@ public class AnimationPanel extends JPanel {
 
     private void addImageRow() {
         ImageRowPanel newRow = new ImageRowPanel();
+        newRow.setVariableParser(variableParser);
         newRow.setOnRemoveCallback(() -> {
             imageRowsPanel.remove(newRow);
             imageRowPanels.remove(newRow);

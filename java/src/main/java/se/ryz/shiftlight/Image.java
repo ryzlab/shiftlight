@@ -21,10 +21,14 @@ public class Image {
     private String blinkMode;
 
     public Image(String csvLine) {
-        parseCsvLine(csvLine);
+        parseCsvLine(csvLine, null);
     }
 
-    private void parseCsvLine(String csvLine) {
+    public Image(String csvLine, VariableParser variableParser) {
+        parseCsvLine(csvLine, variableParser);
+    }
+
+    private void parseCsvLine(String csvLine, VariableParser variableParser) {
         String trimmed = csvLine.trim();
         
         // Find the bracket part (first value)
@@ -55,15 +59,15 @@ public class Image {
         // Parse LED indices from the bracket part
         ledIndices = parseLedIndices(ledPart.substring(1, ledPart.length() - 1));
         
-        // Parse the remaining 9 values
-        startRPM = Integer.parseInt(parts[0].trim());
-        endRPM = Integer.parseInt(parts[1].trim());
-        startRed = Integer.parseInt(parts[2].trim());
-        startGreen = Integer.parseInt(parts[3].trim());
-        startBlue = Integer.parseInt(parts[4].trim());
-        endRed = Integer.parseInt(parts[5].trim());
-        endGreen = Integer.parseInt(parts[6].trim());
-        endBlue = Integer.parseInt(parts[7].trim());
+        // Parse the remaining 9 values, supporting variable expressions
+        startRPM = parseNumericValue(parts[0].trim(), variableParser);
+        endRPM = parseNumericValue(parts[1].trim(), variableParser);
+        startRed = parseNumericValue(parts[2].trim(), variableParser);
+        startGreen = parseNumericValue(parts[3].trim(), variableParser);
+        startBlue = parseNumericValue(parts[4].trim(), variableParser);
+        endRed = parseNumericValue(parts[5].trim(), variableParser);
+        endGreen = parseNumericValue(parts[6].trim(), variableParser);
+        endBlue = parseNumericValue(parts[7].trim(), variableParser);
         
         // Validate RPM values (range 0-9999)
         if (startRPM < 0 || startRPM > 9999) {
@@ -147,6 +151,28 @@ public class Image {
         }
         
         return indices;
+    }
+
+    private int parseNumericValue(String value, VariableParser variableParser) {
+        if (variableParser != null) {
+            try {
+                return variableParser.evaluateExpression(value);
+            } catch (IllegalArgumentException e) {
+                // If variable parsing fails, try as plain integer
+                try {
+                    return Integer.parseInt(value);
+                } catch (NumberFormatException ex) {
+                    throw new IllegalArgumentException("Invalid numeric value or expression: " + value + ". " + e.getMessage());
+                }
+            }
+        } else {
+            // No variable parser, parse as plain integer
+            try {
+                return Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid numeric value: " + value);
+            }
+        }
     }
 
     /**

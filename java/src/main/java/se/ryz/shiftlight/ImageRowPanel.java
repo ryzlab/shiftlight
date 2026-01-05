@@ -14,11 +14,17 @@ public class ImageRowPanel extends JPanel {
     private Image currentImage;
     private Runnable onRemoveCallback;
     private Runnable onValidityChangedCallback;
+    private VariableParser variableParser;
 
     public ImageRowPanel() {
         this.startColor = Color.BLACK;
         this.endColor = Color.BLACK;
+        this.variableParser = null;
         initializeComponents();
+    }
+
+    public void setVariableParser(VariableParser variableParser) {
+        this.variableParser = variableParser;
     }
 
     private void initializeComponents() {
@@ -129,7 +135,7 @@ public class ImageRowPanel extends JPanel {
         }
 
         try {
-            Image image = new Image(csvLine);
+            Image image = variableParser != null ? new Image(csvLine, variableParser) : new Image(csvLine);
             this.currentImage = image;
             
             // Update colors from the image
@@ -276,12 +282,17 @@ public class ImageRowPanel extends JPanel {
             return true; // Empty is considered valid (not invalid)
         }
         try {
-            new Image(csvLine);
+            if (variableParser != null) {
+                new Image(csvLine, variableParser);
+            } else {
+                new Image(csvLine);
+            }
             return true;
         } catch (IllegalArgumentException e) {
             return false;
         }
     }
+
 
     public void setOnValidityChangedCallback(Runnable callback) {
         this.onValidityChangedCallback = callback;
