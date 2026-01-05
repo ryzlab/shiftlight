@@ -25,8 +25,56 @@ public class ImageRowPanel extends JPanel {
 
     public void setVariableParser(VariableParser variableParser) {
         this.variableParser = variableParser;
-        // Update tooltip when variable parser changes
-        updateTooltip();
+        // Re-validate CSV with new variables and update border/tooltip
+        revalidateCsv();
+    }
+
+    public void revalidateCsv() {
+        String csvLine = csvTextField.getText().trim();
+        if (csvLine.isEmpty()) {
+            csvTextField.setToolTipText(null);
+            csvTextField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.GRAY),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+            ));
+            notifyValidityChanged();
+            return;
+        }
+
+        try {
+            // Try to parse with current variable parser
+            Image image = variableParser != null ? new Image(csvLine, variableParser) : new Image(csvLine);
+            this.currentImage = image;
+            
+            // Valid CSV - update colors and clear error indication
+            startColor = new Color(
+                Math.max(0, Math.min(255, image.getStartRed())),
+                Math.max(0, Math.min(255, image.getStartGreen())),
+                Math.max(0, Math.min(255, image.getStartBlue()))
+            );
+            endColor = new Color(
+                Math.max(0, Math.min(255, image.getEndRed())),
+                Math.max(0, Math.min(255, image.getEndGreen())),
+                Math.max(0, Math.min(255, image.getEndBlue()))
+            );
+            
+            startColorButton.setBackground(startColor);
+            endColorButton.setBackground(endColor);
+            csvTextField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.GRAY),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+            ));
+            updateTooltip();
+            notifyValidityChanged();
+        } catch (IllegalArgumentException e) {
+            // Invalid CSV - show error
+            csvTextField.setToolTipText("Invalid CSV: " + e.getMessage());
+            csvTextField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.RED, 2),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+            ));
+            notifyValidityChanged();
+        }
     }
 
     private void initializeComponents() {

@@ -115,7 +115,7 @@ public class AnimationPanel extends JPanel {
             // Variables parsed successfully, update button states
             updateButtonStates();
             // Re-validate all rows to check if they're still valid with new variables
-            // This will also update tooltips since setVariableParser calls updateTooltip
+            // This will update borders (red for invalid, gray for valid) and tooltips
             for (ImageRowPanel rowPanel : imageRowPanels) {
                 rowPanel.setVariableParser(variableParser);
             }
