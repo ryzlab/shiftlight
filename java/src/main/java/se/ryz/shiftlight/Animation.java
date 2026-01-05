@@ -156,5 +156,24 @@ public class Animation {
             listener.animationChanged(event);
         }
     }
+
+    /**
+     * Generates a formatted string with evaluated CSV lines.
+     * The output starts with "BEGIN" and ends with "END", with evaluated CSV lines in between.
+     * 
+     * @return formatted string with BEGIN/END markers and evaluated CSV lines
+     */
+    public String generateProgramOutput() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("BEGIN\n");
+        
+        for (Image image : images) {
+            // Use toCsvLine() which returns the evaluated CSV (with numeric values)
+            sb.append(image.toCsvLine()).append("\n");
+        }
+        
+        sb.append("END");
+        return sb.toString();
+    }
 }
 
