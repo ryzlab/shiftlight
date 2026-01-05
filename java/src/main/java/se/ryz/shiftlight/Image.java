@@ -25,30 +25,46 @@ public class Image {
     }
 
     private void parseCsvLine(String csvLine) {
-        String[] parts = csvLine.split(",");
+        String trimmed = csvLine.trim();
         
-        if (parts.length != 10) {
-            throw new IllegalArgumentException("CSV line must have exactly 10 values (9 commas)");
-        }
-
-        // Parse LED indices from the first part (format: [1,2,4-6,8])
-        String ledPart = parts[0].trim();
-        if (!ledPart.startsWith("[") || !ledPart.endsWith("]")) {
+        // Find the bracket part (first value)
+        int bracketStart = trimmed.indexOf('[');
+        int bracketEnd = trimmed.indexOf(']');
+        
+        if (bracketStart != 0 || bracketEnd == -1) {
             throw new IllegalArgumentException("First value must be in brackets: [1,2,4-6,8]");
         }
         
+        // Extract the bracket part (including brackets)
+        String ledPart = trimmed.substring(bracketStart, bracketEnd + 1);
+        
+        // Extract the rest after the closing bracket and comma
+        String rest = trimmed.substring(bracketEnd + 1).trim();
+        if (!rest.startsWith(",")) {
+            throw new IllegalArgumentException("Missing comma after bracket part");
+        }
+        rest = rest.substring(1); // Remove the comma
+        
+        // Split the remaining part by commas (these are the actual separators)
+        String[] parts = rest.split(",");
+        
+        if (parts.length != 9) {
+            throw new IllegalArgumentException("CSV line must have exactly 10 values (9 commas outside brackets)");
+        }
+        
+        // Parse LED indices from the bracket part
         ledIndices = parseLedIndices(ledPart.substring(1, ledPart.length() - 1));
         
-        // Parse the remaining values
-        startRPM = Integer.parseInt(parts[1].trim());
-        endRPM = Integer.parseInt(parts[2].trim());
-        startRed = Integer.parseInt(parts[3].trim());
-        startGreen = Integer.parseInt(parts[4].trim());
-        startBlue = Integer.parseInt(parts[5].trim());
-        endRed = Integer.parseInt(parts[6].trim());
-        endGreen = Integer.parseInt(parts[7].trim());
-        endBlue = Integer.parseInt(parts[8].trim());
-        blinkMode = parts[9].trim();
+        // Parse the remaining 9 values
+        startRPM = Integer.parseInt(parts[0].trim());
+        endRPM = Integer.parseInt(parts[1].trim());
+        startRed = Integer.parseInt(parts[2].trim());
+        startGreen = Integer.parseInt(parts[3].trim());
+        startBlue = Integer.parseInt(parts[4].trim());
+        endRed = Integer.parseInt(parts[5].trim());
+        endGreen = Integer.parseInt(parts[6].trim());
+        endBlue = Integer.parseInt(parts[7].trim());
+        blinkMode = parts[8].trim();
     }
 
     private List<Integer> parseLedIndices(String ledString) {
