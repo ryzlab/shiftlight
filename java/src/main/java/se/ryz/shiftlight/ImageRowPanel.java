@@ -13,6 +13,7 @@ public class ImageRowPanel extends JPanel {
     private Color endColor;
     private Image currentImage;
     private Runnable onRemoveCallback;
+    private Runnable onDuplicateCallback;
     private Runnable onValidityChangedCallback;
     private VariableParser variableParser;
 
@@ -147,6 +148,14 @@ public class ImageRowPanel extends JPanel {
         rightArrowButton.setToolTipText("Copy Start RGB to End RGB");
         rightArrowButton.addActionListener(e -> copyStartToEnd());
 
+        JButton duplicateButton = new JButton("Duplicate");
+        duplicateButton.setAlignmentY(Component.CENTER_ALIGNMENT);
+        duplicateButton.addActionListener(e -> {
+            if (onDuplicateCallback != null) {
+                onDuplicateCallback.run();
+            }
+        });
+
         JButton removeButton = new JButton("Remove");
         removeButton.setAlignmentY(Component.CENTER_ALIGNMENT);
         removeButton.addActionListener(e -> {
@@ -163,6 +172,8 @@ public class ImageRowPanel extends JPanel {
         colorPanel.add(rightArrowButton);
         colorPanel.add(Box.createHorizontalStrut(5));
         colorPanel.add(endColorButton);
+        colorPanel.add(Box.createHorizontalStrut(5));
+        colorPanel.add(duplicateButton);
         colorPanel.add(Box.createHorizontalStrut(5));
         colorPanel.add(removeButton);
 
@@ -340,6 +351,10 @@ public class ImageRowPanel extends JPanel {
 
     public void setOnRemoveCallback(Runnable callback) {
         this.onRemoveCallback = callback;
+    }
+
+    public void setOnDuplicateCallback(Runnable callback) {
+        this.onDuplicateCallback = callback;
     }
 
     public Image getImage() {

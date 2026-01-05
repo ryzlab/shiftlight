@@ -132,14 +132,19 @@ public class AnimationPanel extends JPanel {
         imageRowPanels.clear();
 
         List<Image> images = animation.getImages();
-        for (Image image : images) {
+        for (int i = 0; i < images.size(); i++) {
+            Image image = images.get(i);
             ImageRowPanel rowPanel = new ImageRowPanel();
             rowPanel.setVariableParser(variableParser);
             rowPanel.setCsvLine(image.toCsvLine());
             // Store reference to the image for reliable removal
             final Image imageRef = image;
+            final int imageIndex = i;
             rowPanel.setOnRemoveCallback(() -> {
                 animation.remove(imageRef);
+            });
+            rowPanel.setOnDuplicateCallback(() -> {
+                duplicateRow(rowPanel, imageIndex);
             });
             rowPanel.setOnValidityChangedCallback(() -> updateButtonStates());
             rowPanel.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
@@ -173,6 +178,9 @@ public class AnimationPanel extends JPanel {
                 revalidate();
                 repaint();
             }
+        });
+        emptyRow.setOnDuplicateCallback(() -> {
+            duplicateRow(emptyRow, -1);
         });
         emptyRow.setOnValidityChangedCallback(() -> updateButtonStates());
         emptyRow.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
@@ -208,6 +216,9 @@ public class AnimationPanel extends JPanel {
             updateButtonStates();
             revalidate();
             repaint();
+        });
+        newRow.setOnDuplicateCallback(() -> {
+            duplicateRow(newRow, -1);
         });
         newRow.setOnValidityChangedCallback(() -> updateButtonStates());
         newRow.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
@@ -269,6 +280,76 @@ public class AnimationPanel extends JPanel {
 
     public void setVariablesText(String text) {
         variablesTextArea.setText(text);
+    }
+
+    private void duplicateRow(ImageRowPanel sourceRow, int imageIndex) {
+        String csvLine = sourceRow.getCsvLine();
+        if (csvLine.isEmpty()) {
+            return; // Nothing to duplicate
+        }
+
+        // Find the index of the source row in the panel
+        int sourceIndex = imageRowPanels.indexOf(sourceRow);
+        if (sourceIndex == -1) {
+            return;
+        }
+
+        // Create a new row with the same CSV
+        ImageRowPanel newRow = new ImageRowPanel();
+        newRow.setVariableParser(variableParser);
+        newRow.setCsvLine(csvLine);
+        newRow.setOnRemoveCallback(() -> {
+            imageRowsPanel.remove(newRow);
+            imageRowPanels.remove(newRow);
+            // If it's in the animation, remove it
+            if (newRow.getImage() != null) {
+                animation.remove(newRow.getImage());
+            }
+            revalidate();
+            repaint();
+        });
+        newRow.setOnDuplicateCallback(() -> {
+            duplicateRow(newRow, -1);
+        });
+        newRow.setOnValidityChangedCallback(() -> updateButtonStates());
+        newRow.addCsvDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                updateButtonStates();
+            }
+        });
+
+        // Insert the new row right after the source row
+        int insertIndex = sourceIndex + 1;
+        imageRowPanels.add(insertIndex, newRow);
+        
+        // BoxLayout doesn't support index-based insertion, so we need to rebuild
+        imageRowsPanel.removeAll();
+        for (ImageRowPanel row : imageRowPanels) {
+            imageRowsPanel.add(row);
+        }
+
+        // If the source row is part of the animation, add the duplicate to animation too
+        if (imageIndex >= 0 && imageIndex < animation.getImages().size()) {
+            try {
+                animation.add(csvLine, variableParser);
+            } catch (IllegalArgumentException e) {
+                // Invalid CSV, don't add to animation
+            }
+        }
+
+        revalidate();
+        repaint();
     }
 }
 

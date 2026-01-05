@@ -33,6 +33,14 @@ public class Shiftlight {
         // Create button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         
+        JButton loadButton = new JButton("Load");
+        loadButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                loadFromFile();
+            }
+        });
+        
         saveButton = new JButton("Save");
         saveButton.setToolTipText("All rows must have valid CSV before saving");
         saveButton.addActionListener(new ActionListener() {
@@ -62,6 +70,7 @@ public class Shiftlight {
             }
         });
         
+        buttonPanel.add(loadButton);
         buttonPanel.add(saveButton);
         buttonPanel.add(programButton);
         
@@ -89,6 +98,24 @@ public class Shiftlight {
         // TODO: Implement file saving logic
         System.out.println("Save to file: " + file.getAbsolutePath());
         JOptionPane.showMessageDialog(null, "Saving to: " + file.getAbsolutePath() + "\n(Implementation pending)");
+    }
+
+    private static void loadFromFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Load Animation");
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        
+        int result = fileChooser.showOpenDialog(null);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            handleLoadFile(selectedFile);
+        }
+    }
+
+    private static void handleLoadFile(File file) {
+        // TODO: Implement file loading logic
+        System.out.println("Load from file: " + file.getAbsolutePath());
+        JOptionPane.showMessageDialog(null, "Loading from: " + file.getAbsolutePath() + "\n(Implementation pending)");
     }
 }
 
