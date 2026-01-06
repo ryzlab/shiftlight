@@ -80,9 +80,19 @@ public class Shiftlight {
             }
         });
         
+        JButton testerButton = new JButton("Tester");
+        Tester testerDialog = new Tester(frame);
+        testerButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                testerDialog.setVisible(true);
+            }
+        });
+        
         buttonPanel.add(loadButton);
         buttonPanel.add(saveButton);
         buttonPanel.add(programButton);
+        buttonPanel.add(testerButton);
         
         frame.add(buttonPanel, BorderLayout.SOUTH);
 

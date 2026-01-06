@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'org.graalvm.buildtools.native' version '0.10.1'
 }
 
 group = 'se.ryz.shiftlight'
@@ -44,5 +45,21 @@ jar {
     }
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// To create a native binary, run: ./gradlew nativeCompile
+// The native binary will be created at: build/native/nativeCompile/shiftlight (or shiftlight.exe on Windows)
+graalvmNative {
+    binaries {
+        main {
+            mainClass = 'se.ryz.shiftlight.Shiftlight'
+            imageName = 'shiftlight'
+            javaLauncher = javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(17)
+            }
+        }
+    }
+    
+    toolchainDetection = false
 }
 
