@@ -260,6 +260,10 @@ public class Shiftlight {
 
             // Give the port time to initialize
             Thread.sleep(100);
+            
+            // Get program output
+            String programOutput = animationPanel.generateProgramOutput();
+            System.out.println(programOutput);
 
             // Send HELLO and wait for OK
             System.out.println("Sending HELLO...");
@@ -279,10 +283,6 @@ public class Shiftlight {
             }
 
             System.out.println("Received OK, shiftlight connected");
-
-            // Get program output
-            String programOutput = animationPanel.generateProgramOutput();
-            System.out.println(programOutput);
 
             // Send program output line by line
             String[] lines = programOutput.split("\n");

@@ -300,7 +300,10 @@ public class AnimationPanel extends JPanel {
                 try {
                     // Evaluate the CSV line with variables to get the final values
                     Image image = variableParser != null ? new Image(csvLine, variableParser) : new Image(csvLine);
-                    sb.append(image.toCsvLine()).append("\n");
+                    String outputLine = image.toCsvLine();
+                    // Subtract 1 from each LED index in brackets (convert 1-based to 0-based)
+                    outputLine = adjustLedIndices(outputLine);
+                    sb.append(outputLine).append("\n");
                 } catch (IllegalArgumentException e) {
                     // Skip invalid lines
                     System.err.println("Skipping invalid CSV line in program output: " + csvLine);
@@ -310,6 +313,63 @@ public class AnimationPanel extends JPanel {
         
         sb.append("END");
         return sb.toString();
+    }
+    
+    /**
+     * Adjusts LED indices in brackets by subtracting 1 from each value.
+     * Example: [1,2,7-9] becomes [0,1,6-8]
+     */
+    private String adjustLedIndices(String csvLine) {
+        // Find the bracket part
+        int bracketStart = csvLine.indexOf('[');
+        int bracketEnd = csvLine.indexOf(']');
+        
+        if (bracketStart == -1 || bracketEnd == -1 || bracketEnd <= bracketStart) {
+            return csvLine; // No brackets found, return as-is
+        }
+        
+        String beforeBrackets = csvLine.substring(0, bracketStart + 1);
+        String bracketContent = csvLine.substring(bracketStart + 1, bracketEnd);
+        String afterBrackets = csvLine.substring(bracketEnd);
+        
+        // Parse and adjust the LED indices
+        StringBuilder adjusted = new StringBuilder();
+        String[] parts = bracketContent.split(",");
+        
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i].trim();
+            if (part.isEmpty()) {
+                continue;
+            }
+            
+            if (i > 0) {
+                adjusted.append(",");
+            }
+            
+            // Check if it's a range (e.g., "7-9")
+            int dashIndex = part.indexOf('-');
+            if (dashIndex > 0) {
+                try {
+                    int start = Integer.parseInt(part.substring(0, dashIndex).trim());
+                    int end = Integer.parseInt(part.substring(dashIndex + 1).trim());
+                    adjusted.append(start - 1).append("-").append(end - 1);
+                } catch (NumberFormatException e) {
+                    // Invalid range format, keep as-is
+                    adjusted.append(part);
+                }
+            } else {
+                // Single number
+                try {
+                    int value = Integer.parseInt(part);
+                    adjusted.append(value - 1);
+                } catch (NumberFormatException e) {
+                    // Invalid number, keep as-is
+                    adjusted.append(part);
+                }
+            }
+        }
+        
+        return beforeBrackets + adjusted.toString() + afterBrackets;
     }
 
     public List<String> getAllCsvLines() {
