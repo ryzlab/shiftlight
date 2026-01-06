@@ -1,5 +1,7 @@
 package se.ryz.shiftlight;
 
+import com.fazecast.jSerialComm.SerialPort;
+
 import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -8,16 +10,34 @@ import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 public class Tester extends JDialog {
     private JTextField textField;
     private JSlider slider;
     private boolean updatingFromTextField = false;
     private boolean updatingFromSlider = false;
+    private SerialPortComboBox serialPortComboBox;
+    private SerialPort serialPort = null;
 
-    public Tester(JFrame parent) {
+    public Tester(JFrame parent, SerialPortComboBox serialPortComboBox) {
         super(parent, "Tester", true);
         setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
+        this.serialPortComboBox = serialPortComboBox;
+        
+        // Close port when dialog is closed
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                closeSerialPort();
+            }
+            
+            @Override
+            public void windowClosed(WindowEvent e) {
+                closeSerialPort();
+            }
+        });
         
         initializeComponents();
         layoutComponents();
@@ -27,6 +47,16 @@ public class Tester extends JDialog {
         Dimension size = getSize();
         setSize(size.width * 2, size.height);
         setLocationRelativeTo(parent);
+    }
+    
+    @Override
+    public void setVisible(boolean visible) {
+        if (visible) {
+            openSerialPort();
+        } else {
+            closeSerialPort();
+        }
+        super.setVisible(visible);
     }
 
     private void initializeComponents() {
@@ -105,6 +135,7 @@ public class Tester extends JDialog {
                 updatingFromTextField = true;
                 slider.setValue(value);
                 updatingFromTextField = false;
+                sendRpmValue(value);
             }
         } catch (NumberFormatException e) {
             // Invalid number, ignore
@@ -120,6 +151,7 @@ public class Tester extends JDialog {
         int value = slider.getValue();
         textField.setText(String.valueOf(value));
         updatingFromSlider = false;
+        sendRpmValue(value);
     }
 
     private void validateAndUpdateTextField() {
@@ -140,10 +172,58 @@ public class Tester extends JDialog {
                 slider.setValue(9999);
             } else {
                 slider.setValue(value);
+                sendRpmValue(value);
             }
         } catch (NumberFormatException e) {
             // Invalid number, reset to current slider value
-            textField.setText(String.valueOf(slider.getValue()));
+            int currentValue = slider.getValue();
+            textField.setText(String.valueOf(currentValue));
+        }
+    }
+    
+    private void openSerialPort() {
+        String selectedPort = serialPortComboBox.getSelectedPortName();
+        if (selectedPort == null || selectedPort.isEmpty()) {
+            return;
+        }
+        
+        serialPort = SerialPort.getCommPort(selectedPort);
+        if (serialPort == null) {
+            return;
+        }
+        
+        serialPort.setBaudRate(9600);
+        if (serialPort.openPort()) {
+            try {
+                Thread.sleep(100); // Give port time to initialize
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            serialPort = null;
+        }
+    }
+    
+    private void closeSerialPort() {
+        if (serialPort != null && serialPort.isOpen()) {
+            serialPort.closePort();
+            serialPort = null;
+        }
+    }
+    
+    private void sendRpmValue(int value) {
+        if (serialPort == null || !serialPort.isOpen()) {
+            return;
+        }
+        
+        String message = "rpm=" + value + "\n";
+        System.out.println(message.trim());
+        
+        try {
+            serialPort.getOutputStream().write(message.getBytes());
+            serialPort.getOutputStream().flush();
+        } catch (Exception e) {
+            System.err.println("Error sending RPM value: " + e.getMessage());
         }
     }
 
