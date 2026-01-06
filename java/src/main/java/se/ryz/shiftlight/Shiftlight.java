@@ -267,7 +267,7 @@ public class Shiftlight {
             port.getOutputStream().flush();
 
             // Wait for response with timeout
-            String response = readResponse(port, 2000); // 2 second timeout
+            String response = readResponse(port, 500); // 500ms timeout
             if (!response.trim().equals("OK")) {
                 port.closePort();
                 JOptionPane.showMessageDialog(parentFrame, 
@@ -296,7 +296,7 @@ public class Shiftlight {
                 port.getOutputStream().flush();
 
                 // Wait for OK response
-                response = readResponse(port, 2000); // 2 second timeout
+                response = readResponse(port, 500); // 500ms timeout
                 if (!response.trim().equals("OK")) {
                     port.closePort();
                     JOptionPane.showMessageDialog(parentFrame, 
