@@ -13,7 +13,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
-public class Tester extends JDialog {
+public class TestDialog extends JDialog {
     private JTextField textField;
     private JSlider slider;
     private boolean updatingFromTextField = false;
@@ -21,8 +21,8 @@ public class Tester extends JDialog {
     private SerialPortComboBox serialPortComboBox;
     private SerialPort serialPort = null;
 
-    public Tester(JFrame parent, SerialPortComboBox serialPortComboBox) {
-        super(parent, "Tester", true);
+    public TestDialog(JFrame parent, SerialPortComboBox serialPortComboBox) {
+        super(parent, "Test", true);
         setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE);
         this.serialPortComboBox = serialPortComboBox;
         

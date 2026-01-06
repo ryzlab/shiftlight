@@ -81,7 +81,7 @@ public class Shiftlight {
         });
         
         JButton testerButton = new JButton("Test");
-        Tester testerDialog = new Tester(frame, serialPortComboBox);
+        TestDialog testerDialog = new TestDialog(frame, serialPortComboBox);
         testerButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
