@@ -19,6 +19,7 @@ public class Image {
     private int endGreen;
     private int endBlue;
     private String blinkMode;
+    private Integer optionalValue; // Optional value (0-255) when blinkMode != 0
 
     public Image(String csvLine) {
         parseCsvLine(csvLine, null);
@@ -52,14 +53,15 @@ public class Image {
         // Split the remaining part by commas (these are the actual separators)
         String[] parts = rest.split(",");
         
-        if (parts.length != 9) {
-            throw new IllegalArgumentException("CSV line must have exactly 10 values (9 commas outside brackets)");
-        }
-        
         // Parse LED indices from the bracket part
         ledIndices = parseLedIndices(ledPart.substring(1, ledPart.length() - 1));
         
-        // Parse the remaining 9 values, supporting variable expressions
+        // Parse the remaining values, supporting variable expressions
+        // First 8 values are always required
+        if (parts.length < 9) {
+            throw new IllegalArgumentException("CSV line must have at least 10 values (9 commas outside brackets)");
+        }
+        
         startRPM = parseNumericValue(parts[0].trim(), variableParser);
         endRPM = parseNumericValue(parts[1].trim(), variableParser);
         startRed = parseNumericValue(parts[2].trim(), variableParser);
@@ -102,16 +104,40 @@ public class Image {
             throw new IllegalArgumentException("End Blue must be in range 0-255, got: " + endBlue);
         }
         
-        // Validate blinkMode (last value) is in range 0-2
+        // Validate blinkMode (9th value) is in range 0-2
         String blinkModeStr = parts[8].trim();
+        int blinkModeValue;
         try {
-            int blinkModeValue = Integer.parseInt(blinkModeStr);
+            blinkModeValue = Integer.parseInt(blinkModeStr);
             if (blinkModeValue < 0 || blinkModeValue > 2) {
                 throw new IllegalArgumentException("Blink mode must be in range 0-2, got: " + blinkModeValue);
             }
             blinkMode = blinkModeStr;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Blink mode must be a number in range 0-2, got: " + blinkModeStr);
+        }
+        
+        // If blinkMode is not 0, expect an optional value (10th value)
+        optionalValue = null;
+        if (blinkModeValue != 0) {
+            if (parts.length < 10) {
+                throw new IllegalArgumentException("When blink mode is not 0, an additional value (0-255) is required");
+            }
+            int optional = parseNumericValue(parts[9].trim(), variableParser);
+            if (optional < 0 || optional > 255) {
+                throw new IllegalArgumentException("Optional value must be in range 0-255, got: " + optional);
+            }
+            optionalValue = optional;
+            
+            // Validate we don't have extra values
+            if (parts.length > 10) {
+                throw new IllegalArgumentException("CSV line has too many values. Expected 10 values when blink mode is not 0, got: " + (parts.length + 1));
+            }
+        } else {
+            // When blinkMode is 0, we should have exactly 9 values
+            if (parts.length > 9) {
+                throw new IllegalArgumentException("CSV line has too many values. When blink mode is 0, expected 9 values, got: " + (parts.length + 1));
+            }
         }
     }
 
@@ -199,7 +225,11 @@ public class Image {
         sb.append(",").append(endGreen);
         sb.append(",").append(endBlue);
         sb.append(",").append(blinkMode);
-        
+        if (optionalValue == null) {
+            sb.append(",0");
+        } else {
+            sb.append(",").append(optionalValue);
+        }
         return sb.toString();
     }
 

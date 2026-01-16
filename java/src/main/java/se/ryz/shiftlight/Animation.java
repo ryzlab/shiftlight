@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Animation {
-    public static final int MAX_IMAGES = 80;
+    public static final int MAX_IMAGES = 50;
     
     private List<Image> images;
     private final List<AnimationListener> listeners;

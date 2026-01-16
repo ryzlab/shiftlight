@@ -12,7 +12,7 @@ Display::Display(Adafruit_NeoPixel* strip) : strip(strip) {
 }
 
 Display::Image Display::parseImageFromString(const char* csvString) {
-  Image img = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+  Image img = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   
   if (csvString == nullptr) {
     Serial.print(ERROR_PREFIX);
@@ -109,12 +109,12 @@ Display::Image Display::parseImageFromString(const char* csvString) {
     csvStart++;
   }
   
-  // Parse the remaining CSV values (must be exactly 9 values)
-  int values[9];
+  // Parse the remaining CSV values (must be exactly 10 values)
+  int values[10];
   int valueIndex = 0;
   const char* pos = csvStart;
   
-  while (*pos != '\0' && valueIndex < 10) {  // Check up to 10 to detect too many
+  while (*pos != '\0' && valueIndex < 11) {  // Check up to 11 to detect too many
     // Skip whitespace
     while (*pos == ' ' || *pos == '\t') pos++;
     
@@ -153,12 +153,12 @@ Display::Image Display::parseImageFromString(const char* csvString) {
     }
   }
   
-  // Validate exactly 9 values (not more, not less)
-  if (valueIndex != 9) {
+  // Validate exactly 10 values (not more, not less)
+  if (valueIndex != 10) {
     Serial.print(ERROR_PREFIX);
     Serial.print("Invalid number of CSV values: ");
     Serial.print(valueIndex);
-    Serial.println(" (expected 9)");
+    Serial.println(" (expected 10)");
     img.bitmask = INVALID_BITMASK;
     return img;
   }
@@ -173,7 +173,7 @@ Display::Image Display::parseImageFromString(const char* csvString) {
   img.endGreen = values[6];
   img.endBlue = values[7];
   
-  // Extract the last value (0-2) and store in bits 14-15 of 16-bit bitmask
+  // Extract blink rate value (0-2) and store in bits 14-15 of 16-bit bitmask
   int blinkValue = values[8];
   if (blinkValue < 0 || blinkValue > 2) {
     Serial.print(ERROR_PREFIX);
@@ -184,6 +184,18 @@ Display::Image Display::parseImageFromString(const char* csvString) {
     return img;
   }
   img.bitmask |= ((unsigned int)blinkValue << 14);
+  
+  // Extract frequency value (0-255)
+  int frequencyValue = values[9];
+  if (frequencyValue < 0 || frequencyValue > 255) {
+    Serial.print(ERROR_PREFIX);
+    Serial.print("Invalid frequency value: ");
+    Serial.print(frequencyValue);
+    Serial.println(" (expected 0-255)");
+    img.bitmask = INVALID_BITMASK;
+    return img;
+  }
+  img.frequency = (uint8_t)frequencyValue;
   
   // Success - optionally print success message
   // Serial.print(SUCCESS_PREFIX);
@@ -411,6 +423,8 @@ void Display::printAllImages() const {
     Serial.print(",");
     Serial.print(img.endBlue);
     Serial.print(",");
-    Serial.println(blinkRateValue);
+    Serial.print(blinkRateValue);
+    Serial.print(",");
+    Serial.println(img.frequency);
   }
 }

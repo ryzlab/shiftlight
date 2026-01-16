@@ -27,9 +27,10 @@ class Display {
       uint8_t endRed;
       uint8_t endGreen;
       uint8_t endBlue;
+      uint8_t frequency;
     };
 
-    static const int MAX_IMAGES = 50;
+    static const int MAX_IMAGES = 40;
     static const int MAX_BIT_INDEX = 13;  // Maximum bit index (bits 0-13)
     static const unsigned int INVALID_BITMASK = 0xFFFF;  // Sentinel value for invalid images
     Image images[MAX_IMAGES] PROGMEM;
