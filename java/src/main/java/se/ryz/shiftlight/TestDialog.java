@@ -192,15 +192,11 @@ public class TestDialog extends JDialog {
             return;
         }
         
-        serialPort.setBaudRate(9600);
-        if (serialPort.openPort()) {
-            try {
-                Thread.sleep(100); // Give port time to initialize
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        } else {
-            serialPort = null;
+        // Open port and wait for READY (using the same method as Shiftlight)
+        serialPort = Shiftlight.openPortAndWaitForReady(serialPort, (JFrame) getParent());
+        if (serialPort == null) {
+            // Error already shown in openPortAndWaitForReady
+            return;
         }
     }
     

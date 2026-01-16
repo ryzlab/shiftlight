@@ -248,18 +248,12 @@ public class Shiftlight {
         }
 
         try {
-            // Open port with 9600 baud
-            port.setBaudRate(9600);
-            if (!port.openPort()) {
-                JOptionPane.showMessageDialog(parentFrame, 
-                    "Failed to open serial port: " + selectedPort, 
-                    "Port Error", 
-                    JOptionPane.ERROR_MESSAGE);
+            // Open port and wait for READY
+            port = openPortAndWaitForReady(port, parentFrame);
+            if (port == null) {
+                // Error already shown in openPortAndWaitForReady
                 return;
             }
-
-            // Give the port time to initialize
-            Thread.sleep(100);
             
             // Get program output
             String programOutput = animationPanel.generateProgramOutput();
@@ -270,13 +264,14 @@ public class Shiftlight {
             port.getOutputStream().write("HELLO\n".getBytes());
             port.getOutputStream().flush();
 
-            // Wait for response with timeout
-            String response = readResponse(port, 2000); // 2 second timeout
-            if (!response.trim().equals("OK")) {
+            // Read lines until "OK" appears, ignoring lines starting with "#"
+            String response = readUntilOK(port, 2000); // 2 second timeout
+            if (response == null || !response.trim().equals("OK")) {
                 port.closePort();
+                String errorMsg = response == null ? "(no response)" : response;
                 JOptionPane.showMessageDialog(parentFrame, 
                     "No shiftlight connected to port " + selectedPort + ".\n" +
-                    "Expected 'OK' but received: " + (response.isEmpty() ? "(no response)" : response), 
+                    "Expected 'OK' but received: " + errorMsg, 
                     "Connection Failed", 
                     JOptionPane.ERROR_MESSAGE);
                 return;
@@ -352,6 +347,147 @@ public class Shiftlight {
         }
         
         return response.toString();
+    }
+    
+    /**
+     * Opens the serial port and waits for "READY" message, ignoring comment lines starting with "#".
+     * Returns the port if "READY" is received within 2 seconds, or null if timeout/error occurs.
+     */
+    static SerialPort openPortAndWaitForReady(SerialPort port, JFrame parentFrame) {
+        // Set baud rate
+        port.setBaudRate(9600);
+        
+        // Open the port (this will cause Arduino to reset)
+        if (!port.openPort()) {
+            JOptionPane.showMessageDialog(parentFrame, 
+                "Failed to open serial port: " + port.getSystemPortName(), 
+                "Port Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+        
+        // Give the port time to initialize after reset
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            port.closePort();
+            return null;
+        }
+        
+        // Read lines until "READY" appears, ignoring lines starting with "#"
+        String result = readUntilReady(port, 2000); // 2 second timeout
+        if (result == null || !result.equals("READY")) {
+            port.closePort();
+            String errorMsg = result == null ? "(no response)" : result;
+            JOptionPane.showMessageDialog(parentFrame, 
+                "Device did not become ready on port " + port.getSystemPortName() + ".\n" +
+                "Expected 'READY' but received: " + errorMsg, 
+                "Connection Failed", 
+                JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+        
+        System.out.println("Device is READY");
+        return port;
+    }
+    
+    /**
+     * Reads lines from the serial port until "READY" appears, ignoring lines starting with "#".
+     * Returns "READY" if found, or null if timeout occurs without finding "READY".
+     */
+    private static String readUntilReady(SerialPort port, int timeoutMs) {
+        StringBuilder allLines = new StringBuilder();
+        long startTime = System.currentTimeMillis();
+        String currentLine = "";
+        
+        try {
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (port.bytesAvailable() > 0) {
+                    byte[] buffer = new byte[port.bytesAvailable()];
+                    int bytesRead = port.readBytes(buffer, buffer.length);
+                    if (bytesRead > 0) {
+                        String newData = new String(buffer, 0, bytesRead);
+                        currentLine += newData;
+                        
+                        // Process complete lines
+                        while (currentLine.contains("\n")) {
+                            int newlineIndex = currentLine.indexOf("\n");
+                            String line = currentLine.substring(0, newlineIndex).trim();
+                            currentLine = currentLine.substring(newlineIndex + 1);
+                            
+                            // Ignore empty lines and lines starting with "#"
+                            if (!line.isEmpty() && !line.startsWith("#")) {
+                                // Check if this line is "READY"
+                                if (line.equals("READY")) {
+                                    return "READY";
+                                }
+                                // Store non-comment lines for error reporting
+                                if (allLines.length() > 0) {
+                                    allLines.append("\n");
+                                }
+                                allLines.append(line);
+                            }
+                        }
+                    }
+                }
+                Thread.sleep(10); // Small delay to avoid busy waiting
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        // Timeout occurred, return what we received (or null if nothing)
+        return allLines.length() > 0 ? allLines.toString() : null;
+    }
+    
+    /**
+     * Reads lines from the serial port until "OK" appears, ignoring lines starting with "#".
+     * Returns "OK" if found, or null if timeout occurs without finding "OK".
+     */
+    private static String readUntilOK(SerialPort port, int timeoutMs) {
+        StringBuilder allLines = new StringBuilder();
+        long startTime = System.currentTimeMillis();
+        String currentLine = "";
+        
+        try {
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (port.bytesAvailable() > 0) {
+                    byte[] buffer = new byte[port.bytesAvailable()];
+                    int bytesRead = port.readBytes(buffer, buffer.length);
+                    if (bytesRead > 0) {
+                        String newData = new String(buffer, 0, bytesRead);
+                        currentLine += newData;
+                        
+                        // Process complete lines
+                        while (currentLine.contains("\n")) {
+                            int newlineIndex = currentLine.indexOf("\n");
+                            String line = currentLine.substring(0, newlineIndex).trim();
+                            currentLine = currentLine.substring(newlineIndex + 1);
+                            
+                            // Ignore empty lines and lines starting with "#"
+                            if (!line.isEmpty() && !line.startsWith("#")) {
+                                // Check if this line is "OK"
+                                if (line.equals("OK")) {
+                                    return "OK";
+                                }
+                                // Store non-comment lines for error reporting
+                                if (allLines.length() > 0) {
+                                    allLines.append("\n");
+                                }
+                                allLines.append(line);
+                            }
+                        }
+                    }
+                }
+                Thread.sleep(10); // Small delay to avoid busy waiting
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        // Timeout occurred, return what we received (or null if nothing)
+        return allLines.length() > 0 ? allLines.toString() : null;
     }
 }
 

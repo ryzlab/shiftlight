@@ -29,10 +29,10 @@ class Display {
       uint8_t endBlue;
     };
 
-    static const int MAX_IMAGES = 80;
+    static const int MAX_IMAGES = 50;
     static const int MAX_BIT_INDEX = 13;  // Maximum bit index (bits 0-13)
     static const unsigned int INVALID_BITMASK = 0xFFFF;  // Sentinel value for invalid images
-    Image images[MAX_IMAGES];
+    Image images[MAX_IMAGES] PROGMEM;
     int imageCount;
     ColorResult colorResult;
     Adafruit_NeoPixel* strip;  // Private instance variable

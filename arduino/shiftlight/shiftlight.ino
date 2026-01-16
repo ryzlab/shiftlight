@@ -132,7 +132,8 @@ unsigned long last = millis();
 unsigned long lastBlinkTime = 0;
 bool blinkState = false;  // false = off, true = on
 unsigned long pulseStartTime = 0;  // For tracking pulse cycle
-
+char line[MAX_LINE_LENGTH + 1];
+  
 void loop() {
   /*rpmReader.loop();
   if (millis() - last > 10) {
@@ -188,9 +189,11 @@ void loop() {
       strip.setPixelColor(i, pulsedRed, pulsedGreen, pulsedBlue);
     }
   }
+  /*for (int i = 0; i < NUM_LEDS; i++) {
+        strip.setPixelColor(i, random(255), random(255), random(255));
+  }*/
   strip.show();
 
-  char line[MAX_LINE_LENGTH + 1];
   if (readSerialLine(line, sizeof(line))) {
     // Check for rpm command
     if (strncmp(line, "rpm=", 4) == 0) {
@@ -226,10 +229,10 @@ void loop() {
       if (readingImages) {
         int imagesWritten = display.writeImagesToEEPROM();
         readingImages = false;
-        Serial.print("OK");
-        Serial.print(" wrote ");
-        Serial.print(imagesWritten);
-        Serial.println(" rows");
+        Serial.println("OK");
+        //Serial.print(" wrote ");
+        //Serial.print(imagesWritten);
+        //Serial.println(" rows");
       }
     }
     // Check for LIST command (case-insensitive)
