@@ -124,6 +124,7 @@ void setup() {
   
     // Process initial RPM (0) to display the pattern
     display.processRPM(0);
+    Serial.println("READY");
   
 }
 
