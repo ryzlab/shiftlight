@@ -17,7 +17,7 @@ RPMReader rpmReader(CS_PIN, INT_PIN);
 #define LED_PIN 4
 #define NUM_LEDS 13
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_RGB + NEO_KHZ800);
 
 Display display(&strip);  // Pass pointer to strip
 

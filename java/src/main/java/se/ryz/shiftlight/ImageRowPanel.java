@@ -316,7 +316,8 @@ public class ImageRowPanel extends JPanel {
                 // Split the remaining part by commas (these are the actual separators)
                 String[] parts = rest.split(",");
                 
-                if (parts.length != 9) {
+                // Handle optional value: can have 9 values (without optional) or 10 values (with optional)
+                if (parts.length < 9 || parts.length > 10) {
                     return; // Invalid number of parts
                 }
                 
@@ -328,8 +329,23 @@ public class ImageRowPanel extends JPanel {
                 parts[6] = String.valueOf(endColor.getGreen());   // endGreen
                 parts[7] = String.valueOf(endColor.getBlue());    // endBlue
                 
+                // If blinkMode (parts[8]) is 0, remove the optional value (parts[9]) if present
+                String[] finalParts = parts;
+                if (parts.length == 10) {
+                    try {
+                        int blinkMode = Integer.parseInt(parts[8].trim());
+                        if (blinkMode == 0) {
+                            // Remove the optional value (last element)
+                            finalParts = new String[9];
+                            System.arraycopy(parts, 0, finalParts, 0, 9);
+                        }
+                    } catch (NumberFormatException e) {
+                        // If blinkMode is not a number, keep all parts
+                    }
+                }
+                
                 // Reconstruct the CSV line
-                String updatedCsv = ledPart + "," + String.join(",", parts);
+                String updatedCsv = ledPart + "," + String.join(",", finalParts);
                 csvTextField.setText(updatedCsv);
                 
                 // Update current image
