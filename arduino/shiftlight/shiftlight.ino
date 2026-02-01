@@ -144,9 +144,6 @@ void setup() {
 }
 
 unsigned long last = millis();
-unsigned long lastBlinkTime = 0;
-bool blinkState = false;  // false = off, true = on
-unsigned long pulseStartTime = 0;  // For tracking pulse cycle
 char line[MAX_LINE_LENGTH + 1];
   
 void loop() {
@@ -159,26 +156,6 @@ void loop() {
 
   // Handle blinking timing
   unsigned long currentTime = millis();
-  unsigned long blinkInterval = 500;  // 500ms for blinkRate = 1
-  unsigned long pulseCycleTime = 2000;  // 2 seconds for full pulse cycle (blinkRate = 2)
-  
-  // Check if it's time to toggle blink state for blinkRate = 1
-  if (currentTime - lastBlinkTime >= blinkInterval) {
-    blinkState = !blinkState;
-    lastBlinkTime = currentTime;
-  }
-
-  // Calculate pulse brightness for blinkRate = 2 (0-255)
-  // Use a triangle wave: goes from 0 to 255 and back to 0
-  unsigned long pulsePhase = currentTime % pulseCycleTime;
-  uint8_t pulseBrightness;
-  if (pulsePhase < pulseCycleTime / 2) {
-    // Fading in: 0 to 255
-    pulseBrightness = (uint8_t)((pulsePhase * 255) / (pulseCycleTime / 2));
-  } else {
-    // Fading out: 255 to 0
-    pulseBrightness = (uint8_t)(255 - ((pulsePhase - pulseCycleTime / 2) * 255) / (pulseCycleTime / 2));
-  }
 
   // Display the current ColorResult on the LEDs with blinking
   const ColorResult& colorResult = display.getColorResult();
@@ -188,19 +165,11 @@ void loop() {
       // No blinking - always show the color
       strip.setPixelColor(i, colorResult.red[i], colorResult.green[i], colorResult.blue[i]);
     } else if (blinkRate == 1) {
-      // Blink rate 1: 500ms on, 500ms off
-      if (blinkState) {
-        strip.setPixelColor(i, colorResult.red[i], colorResult.green[i], colorResult.blue[i]);
-      } else {
-        strip.setPixelColor(i, 0, 0, 0);  // Off
-      }
+      Color blinkColor = display.calculateBlink(colorResult, i, currentTime);
+      strip.setPixelColor(i, blinkColor.red, blinkColor.green, blinkColor.blue);
     } else if (blinkRate == 2) {
-      // Blink rate 2: pulse (slow fade in and out)
-      // Apply pulse brightness to the color
-      uint8_t pulsedRed = (colorResult.red[i] * pulseBrightness) / 255;
-      uint8_t pulsedGreen = (colorResult.green[i] * pulseBrightness) / 255;
-      uint8_t pulsedBlue = (colorResult.blue[i] * pulseBrightness) / 255;
-      strip.setPixelColor(i, pulsedRed, pulsedGreen, pulsedBlue);
+      Color pulseColor = display.calculatePulse(colorResult, i, currentTime);
+      strip.setPixelColor(i, pulseColor.red, pulseColor.green, pulseColor.blue);
     }
   }
   /*for (int i = 0; i < NUM_LEDS; i++) {

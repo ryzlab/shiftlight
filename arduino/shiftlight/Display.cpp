@@ -296,11 +296,12 @@ void Display::calculateColors(int rpm, const Image& img, ColorResult& result) {
       result.green[i] = calculatedGreen;
       result.blue[i] = calculatedBlue;
       result.blinkRate[i] = blinkRateValue;
+      // Set frequency from image
+      result.frequency[i] = img.frequency;
+
     }
   }
   
-  // Set frequency from image
-  result.frequency = img.frequency;
 }
 
 void Display::processRPM(int rpm) {
@@ -335,6 +336,37 @@ bool Display::addImageFromString(const char* csvString) {
 
 const ColorResult& Display::getColorResult() const {
   return colorResult;
+}
+Color Display::calculatePulse(const ColorResult& colorResult, int index, unsigned long currentTime) {
+  Color blinkColor = {0, 0, 0};
+
+  int frequency = colorResult.frequency[index];
+
+  int interval = (currentTime/100 / frequency) % 2;
+
+  int yValue = currentTime/100 % frequency;
+
+  float fraction = yValue / (float)frequency;
+
+  uint8_t red = (uint8_t) ((float)colorResult.red[index] * fraction);
+  uint8_t green = (uint8_t) ((float)colorResult.green[index] * fraction);
+  uint8_t blue = (uint8_t) ((float)colorResult.blue[index] * fraction);
+
+  if (interval == 0) {
+    return Color {red, green, blue};
+  }
+  return Color {colorResult.red[index]-red, colorResult.green[index]-green, colorResult.blue[index]-blue};
+}
+
+Color Display::calculateBlink(const ColorResult&, int index, unsigned long currentTime) {
+  Color blinkColor = {0, 0, 0};
+  
+  int shouldBeOn = (currentTime/100 / colorResult.frequency[index]) % 2;
+  blinkColor.red = colorResult.red[index] * shouldBeOn;
+  blinkColor.green = colorResult.green[index] * shouldBeOn;
+  blinkColor.blue = colorResult.blue[index] * shouldBeOn;
+  
+  return blinkColor;
 }
 
 void Display::printAllImages() const {

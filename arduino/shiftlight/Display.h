@@ -7,13 +7,19 @@
 const int NUM_LEDS = 13;
 const int MAX_RPM = 9999;
 
+struct Color {
+  uint8_t red;
+  uint8_t green;
+  uint8_t blue;
+};
+
 // Forward declaration or define ColorResult before the class
 struct ColorResult {
   uint8_t red[14];
   uint8_t green[14];
   uint8_t blue[14];
   uint8_t blinkRate[14];
-  uint8_t frequency;
+  uint8_t frequency[14];
 };
 
 class Display {
@@ -53,6 +59,8 @@ class Display {
     void clearImages();
     const ColorResult& getColorResult() const;
     void printAllImages() const;
+    Color calculateBlink(const ColorResult& colorResult, int index, unsigned long currentTime);
+    Color calculatePulse(const ColorResult& colorResult, int index, unsigned long currentTime);
 
 
 };
