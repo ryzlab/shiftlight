@@ -13,6 +13,7 @@ struct ColorResult {
   uint8_t green[14];
   uint8_t blue[14];
   uint8_t blinkRate[14];
+  uint8_t frequency;
 };
 
 class Display {
@@ -30,10 +31,10 @@ class Display {
       uint8_t frequency;
     };
 
-    static const int MAX_IMAGES = 40;
+    static const int MAX_IMAGES = 60;
     static const int MAX_BIT_INDEX = 13;  // Maximum bit index (bits 0-13)
     static const unsigned int INVALID_BITMASK = 0xFFFF;  // Sentinel value for invalid images
-    Image images[MAX_IMAGES] PROGMEM;
+    Image images[MAX_IMAGES];
     int imageCount;
     ColorResult colorResult;
     Adafruit_NeoPixel* strip;  // Private instance variable

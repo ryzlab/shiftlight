@@ -21,18 +21,12 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_RGB + NEO_KHZ
 
 Display display(&strip);  // Pass pointer to strip
 
-const int MAX_LINE_LENGTH = 256;
-char inputBuffer[MAX_LINE_LENGTH + 1];  // Buffer to hold incoming data
-int inputIndex = 0;  // Current position in buffer
-bool discardingLine = false;  // Flag to track if we're discarding a line
+const int MAX_LINE_LENGTH = 80;
+static int inputIndex = 0;  // Current position in buffer
+static bool discardingLine = false;  // Flag to track if we're discarding a line
 bool readingImages = false;  // Flag to track if we're in image reading mode
 
 bool readSerialLine(char* line, int lineSize) {
-  // Clear the output parameter
-  if (line != nullptr && lineSize > 0) {
-    line[0] = '\0';
-  }
-  
   // Only process one character per call (non-blocking)
   if (!Serial.available()) {
     return false;
@@ -47,23 +41,26 @@ bool readSerialLine(char* line, int lineSize) {
       Serial.println("Line too long, discarded");
       discardingLine = false;
       inputIndex = 0;
+      if (line != nullptr && lineSize > 0) {
+        line[0] = '\0';
+      }
       return false;
     }
     
     // Process the line if we have data
-    if (inputIndex > 0) {
+    if (inputIndex > 0 && line != nullptr && lineSize > 0) {
       // Null-terminate the buffer
-      inputBuffer[inputIndex] = '\0';
+      line[inputIndex] = '\0';
       
       // Find start of non-whitespace
       int start = 0;
-      while (start < inputIndex && (inputBuffer[start] == ' ' || inputBuffer[start] == '\t')) {
+      while (start < inputIndex && (line[start] == ' ' || line[start] == '\t')) {
         start++;
       }
       
       // Find end of non-whitespace
       int end = inputIndex - 1;
-      while (end >= start && (inputBuffer[end] == ' ' || inputBuffer[end] == '\t' || inputBuffer[end] == '\r' || inputBuffer[end] == '\n')) {
+      while (end >= start && (line[end] == ' ' || line[end] == '\t' || line[end] == '\r' || line[end] == '\n')) {
         end--;
       }
       
@@ -73,25 +70,40 @@ bool readSerialLine(char* line, int lineSize) {
       // Ignore empty lines (after trimming)
       if (trimmedLength <= 0) {
         inputIndex = 0;
+        line[0] = '\0';
         return false;
       }
       
       // Ignore lines starting with #
-      if (inputBuffer[start] == '#') {
+      if (line[start] == '#') {
         inputIndex = 0;
+        line[0] = '\0';
         return false;
       }
       
-      // Copy trimmed line to output buffer
-      if (line != nullptr && lineSize > 0) {
+      // Shift trimmed content to start of buffer if needed
+      if (start > 0) {
         int copyLength = (trimmedLength < lineSize - 1) ? trimmedLength : lineSize - 1;
-        strncpy(line, &inputBuffer[start], copyLength);
+        for (int i = 0; i < copyLength; i++) {
+          line[i] = line[start + i];
+        }
         line[copyLength] = '\0';
+      } else {
+        // Just truncate at the end
+        int truncateLength = (trimmedLength < lineSize - 1) ? trimmedLength : lineSize - 1;
+        line[truncateLength] = '\0';
       }
       
       inputIndex = 0;
       return true;
     }
+    
+    // No data or invalid parameters
+    inputIndex = 0;
+    if (line != nullptr && lineSize > 0) {
+      line[0] = '\0';
+    }
+    return false;
   } else {
     if (discardingLine) {
       // Continue discarding characters until newline
@@ -99,12 +111,15 @@ bool readSerialLine(char* line, int lineSize) {
     }
     
     // Add character to buffer if there's space
-    if (inputIndex < MAX_LINE_LENGTH) {
-      inputBuffer[inputIndex++] = inChar;
+    if (line != nullptr && inputIndex < lineSize - 1 && inputIndex < MAX_LINE_LENGTH) {
+      line[inputIndex++] = inChar;
     } else {
       // Buffer full, start discarding
       inputIndex = 0;
       discardingLine = true;
+      if (line != nullptr && lineSize > 0) {
+        line[0] = '\0';
+      }
     }
   }
   
@@ -169,7 +184,6 @@ void loop() {
   const ColorResult& colorResult = display.getColorResult();
   for (int i = 0; i < NUM_LEDS; i++) {
     uint8_t blinkRate = colorResult.blinkRate[i];
-    
     if (blinkRate == 0) {
       // No blinking - always show the color
       strip.setPixelColor(i, colorResult.red[i], colorResult.green[i], colorResult.blue[i]);

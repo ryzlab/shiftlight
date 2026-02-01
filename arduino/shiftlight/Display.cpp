@@ -298,6 +298,9 @@ void Display::calculateColors(int rpm, const Image& img, ColorResult& result) {
       result.blinkRate[i] = blinkRateValue;
     }
   }
+  
+  // Set frequency from image
+  result.frequency = img.frequency;
 }
 
 void Display::processRPM(int rpm) {
