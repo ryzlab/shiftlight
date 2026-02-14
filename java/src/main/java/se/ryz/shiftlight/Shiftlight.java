@@ -15,6 +15,7 @@ public class Shiftlight {
     private static AnimationPanel animationPanel;
     private static JButton saveButton;
     private static SerialPortComboBox serialPortComboBox;
+    private static JTextField statusTextField;
 
     public static void main(String[] args) {
         // Initialize the animation model
@@ -34,6 +35,13 @@ public class Shiftlight {
         // Create the animation panel
         animationPanel = new AnimationPanel(animation);
         frame.add(animationPanel, BorderLayout.CENTER);
+        
+        // Set up tooltip change callback
+        animationPanel.setOnTooltipChangedCallback(tooltipText -> {
+            if (statusTextField != null) {
+                statusTextField.setText(tooltipText != null ? tooltipText : "");
+            }
+        });
 
         // Create button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -94,7 +102,26 @@ public class Shiftlight {
         buttonPanel.add(programButton);
         buttonPanel.add(testerButton);
         
-        frame.add(buttonPanel, BorderLayout.SOUTH);
+        // Create status panel at the bottom
+        JPanel statusPanel = new JPanel(new BorderLayout(5, 5));
+        statusPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        JLabel statusLabel = new JLabel("Status:");
+        statusTextField = new JTextField();
+        statusTextField.setEditable(false);
+        statusTextField.setBackground(Color.WHITE);
+        statusTextField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Color.GRAY),
+            BorderFactory.createEmptyBorder(2, 5, 2, 5)
+        ));
+        statusPanel.add(statusLabel, BorderLayout.WEST);
+        statusPanel.add(statusTextField, BorderLayout.CENTER);
+        
+        // Create bottom panel with status and buttons
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(statusPanel, BorderLayout.CENTER);
+        bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        frame.add(bottomPanel, BorderLayout.SOUTH);
 
         // Set frame properties
         frame.setSize(900, 700);

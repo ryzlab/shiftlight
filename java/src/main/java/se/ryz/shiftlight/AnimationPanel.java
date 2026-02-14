@@ -13,6 +13,8 @@ public class AnimationPanel extends JPanel {
     private JButton addRowButton;
     private VariableParser variableParser;
     private final java.util.Map<Image, String> imageToOriginalCsv;
+    private java.util.function.Consumer<String> tooltipChangedCallback;
+    private ImageRowPanel currentlyFocusedRow;
 
     public AnimationPanel(Animation animation) {
         this.animation = animation;
@@ -167,6 +169,7 @@ public class AnimationPanel extends JPanel {
                     updateButtonStates();
                 }
             });
+            setupRowTooltipCallback(rowPanel);
             imageRowPanels.add(rowPanel);
             imageRowsPanel.add(rowPanel);
         }
@@ -203,6 +206,7 @@ public class AnimationPanel extends JPanel {
                 updateButtonStates();
             }
         });
+        setupRowTooltipCallback(emptyRow);
         imageRowPanels.add(emptyRow);
         imageRowsPanel.add(emptyRow);
 
@@ -241,6 +245,7 @@ public class AnimationPanel extends JPanel {
                 updateButtonStates();
             }
         });
+        setupRowTooltipCallback(newRow);
         imageRowPanels.add(newRow);
         imageRowsPanel.add(newRow);
         updateButtonStates();
@@ -384,6 +389,42 @@ public class AnimationPanel extends JPanel {
         return csvLines;
     }
 
+    public void setOnTooltipChangedCallback(java.util.function.Consumer<String> callback) {
+        this.tooltipChangedCallback = callback;
+        // Update all existing rows with the callback
+        for (ImageRowPanel rowPanel : imageRowPanels) {
+            setupRowTooltipCallback(rowPanel);
+        }
+    }
+    
+    private void setupRowTooltipCallback(ImageRowPanel rowPanel) {
+        rowPanel.setOnTooltipChangedCallback(tooltipText -> {
+            // Only update if this is the currently focused row
+            if (rowPanel == currentlyFocusedRow && tooltipChangedCallback != null) {
+                tooltipChangedCallback.accept(tooltipText);
+            }
+        });
+        
+        // Track focus to know which row to show tooltip for
+        rowPanel.getCsvTextField().addFocusListener(new java.awt.event.FocusListener() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                currentlyFocusedRow = rowPanel;
+                // Immediately update tooltip when focus is gained
+                String currentTooltip = rowPanel.getCsvTextField().getToolTipText();
+                if (tooltipChangedCallback != null) {
+                    tooltipChangedCallback.accept(currentTooltip);
+                }
+            }
+            
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                // Optionally clear tooltip when focus is lost, or keep showing last focused row
+                // For now, we'll keep showing the last focused row's tooltip
+            }
+        });
+    }
+
     public void loadFromFile(List<String> variables, List<String> csvLines) {
         // Clear current animation and original CSV map
         animation.clear();
@@ -495,6 +536,7 @@ public class AnimationPanel extends JPanel {
                 updateButtonStates();
             }
         });
+        setupRowTooltipCallback(newRow);
 
         // Insert the new row right after the source row
         int insertIndex = sourceIndex + 1;

@@ -1,6 +1,8 @@
 package se.ryz.shiftlight;
 
 import javax.swing.*;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
@@ -15,6 +17,7 @@ public class ImageRowPanel extends JPanel {
     private Runnable onRemoveCallback;
     private Runnable onDuplicateCallback;
     private Runnable onValidityChangedCallback;
+    private java.util.function.Consumer<String> onTooltipChangedCallback;
     private VariableParser variableParser;
 
     public ImageRowPanel() {
@@ -34,6 +37,7 @@ public class ImageRowPanel extends JPanel {
         String csvLine = csvTextField.getText().trim();
         if (csvLine.isEmpty()) {
             csvTextField.setToolTipText(null);
+            notifyTooltipChanged(null);
             csvTextField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
@@ -68,8 +72,16 @@ public class ImageRowPanel extends JPanel {
             updateTooltip();
             notifyValidityChanged();
         } catch (IllegalArgumentException e) {
-            // Invalid CSV - show error
-            csvTextField.setToolTipText("Invalid CSV: " + e.getMessage());
+            // Invalid CSV - show error with field tooltip if available
+            String fieldTooltip = getFieldTooltip();
+            String errorTooltip;
+            if (fieldTooltip != null) {
+                errorTooltip = fieldTooltip + " | Invalid CSV: " + e.getMessage();
+            } else {
+                errorTooltip = "Invalid CSV: " + e.getMessage();
+            }
+            csvTextField.setToolTipText(errorTooltip);
+            notifyTooltipChanged(errorTooltip);
             csvTextField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.RED, 2),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
@@ -97,16 +109,26 @@ public class ImageRowPanel extends JPanel {
             @Override
             public void insertUpdate(DocumentEvent e) {
                 updateColorsFromCsv();
+                updateTooltipForCurrentField();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
                 updateColorsFromCsv();
+                updateTooltipForCurrentField();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
                 updateColorsFromCsv();
+                updateTooltipForCurrentField();
+            }
+        });
+        
+        csvTextField.addCaretListener(new CaretListener() {
+            @Override
+            public void caretUpdate(CaretEvent e) {
+                updateTooltipForCurrentField();
             }
         });
 
@@ -187,6 +209,7 @@ public class ImageRowPanel extends JPanel {
             currentImage = null;
             // Clear error indication for empty CSV
             csvTextField.setToolTipText(null);
+            notifyTooltipChanged(null);
             csvTextField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.GRAY),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
@@ -226,7 +249,15 @@ public class ImageRowPanel extends JPanel {
             System.err.println("Invalid CSV: " + csvLine);
             System.err.println("Error: " + e.getMessage());
             // Visual feedback: set tooltip and red border
-            csvTextField.setToolTipText("Invalid CSV: " + e.getMessage());
+            String fieldTooltip = getFieldTooltip();
+            String errorTooltip;
+            if (fieldTooltip != null) {
+                errorTooltip = fieldTooltip + " | Invalid CSV: " + e.getMessage();
+            } else {
+                errorTooltip = "Invalid CSV: " + e.getMessage();
+            }
+            csvTextField.setToolTipText(errorTooltip);
+            notifyTooltipChanged(errorTooltip);
             csvTextField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(Color.RED, 2),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
@@ -239,6 +270,7 @@ public class ImageRowPanel extends JPanel {
         String csvLine = csvTextField.getText().trim();
         if (csvLine.isEmpty()) {
             csvTextField.setToolTipText(null);
+            notifyTooltipChanged(null);
             return;
         }
 
@@ -249,12 +281,206 @@ public class ImageRowPanel extends JPanel {
             
             // Only show tooltip if it's different from the original (i.e., has variables)
             if (!evaluatedCsv.equals(csvLine)) {
-                csvTextField.setToolTipText("Evaluated: " + evaluatedCsv);
+                String fieldTooltip = getFieldTooltip();
+                String newTooltip;
+                if (fieldTooltip != null) {
+                    newTooltip = fieldTooltip + " | Evaluated: " + evaluatedCsv;
+                } else {
+                    newTooltip = "Evaluated: " + evaluatedCsv;
+                }
+                csvTextField.setToolTipText(newTooltip);
+                notifyTooltipChanged(newTooltip);
             } else {
-                csvTextField.setToolTipText(null);
+                updateTooltipForCurrentField();
             }
         } catch (IllegalArgumentException e) {
-            // Invalid CSV, tooltip will be set by error handling
+            // Invalid CSV, tooltip will be set by error handling or show field tooltip
+            updateTooltipForCurrentField();
+        }
+    }
+    
+    private void updateTooltipForCurrentField() {
+        String csvLine = csvTextField.getText();
+        if (csvLine == null || csvLine.trim().isEmpty()) {
+            csvTextField.setToolTipText(null);
+            notifyTooltipChanged(null);
+            return;
+        }
+        
+        String currentTooltip = csvTextField.getToolTipText();
+        boolean hasError = currentTooltip != null && currentTooltip.contains("Invalid CSV:");
+        
+        int caretPosition = csvTextField.getCaretPosition();
+        int fieldIndex = getCurrentFieldIndex(csvLine, caretPosition);
+        
+        if (fieldIndex > 0) {
+            String fieldTooltip = getFieldTooltipText(fieldIndex);
+            
+            // If there's an error, preserve it and update field tooltip
+            if (hasError && currentTooltip != null) {
+                // Extract error part
+                String errorPart = "";
+                if (currentTooltip.contains(" | Invalid CSV:")) {
+                    errorPart = currentTooltip.substring(currentTooltip.indexOf(" | Invalid CSV:"));
+                } else if (currentTooltip.startsWith("Invalid CSV:")) {
+                    errorPart = " | " + currentTooltip;
+                }
+                
+                // Check if there's also evaluated CSV
+                String evaluatedPart = "";
+                if (currentTooltip.contains(" | Evaluated: ")) {
+                    int evalIndex = currentTooltip.indexOf(" | Evaluated: ");
+                    if (errorPart.isEmpty() || evalIndex < currentTooltip.indexOf("Invalid CSV:")) {
+                        evaluatedPart = currentTooltip.substring(evalIndex);
+                    }
+                }
+                
+                String newTooltip = fieldTooltip + errorPart + evaluatedPart;
+                csvTextField.setToolTipText(newTooltip);
+                notifyTooltipChanged(newTooltip);
+                return;
+            }
+            
+            // Check if CSV is valid and has variables
+            try {
+                String trimmed = csvLine.trim();
+                if (!trimmed.isEmpty()) {
+                    Image evaluatedImage = variableParser != null ? new Image(trimmed, variableParser) : new Image(trimmed);
+                    String evaluatedCsv = evaluatedImage.toCsvLine();
+                    if (!evaluatedCsv.equals(trimmed)) {
+                        // Has variables - show field tooltip and evaluated CSV
+                        String newTooltip = fieldTooltip + " | Evaluated: " + evaluatedCsv;
+                        csvTextField.setToolTipText(newTooltip);
+                        notifyTooltipChanged(newTooltip);
+                        return;
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                // Invalid CSV - show field tooltip, error will be added by updateColorsFromCsv/revalidateCsv
+                csvTextField.setToolTipText(fieldTooltip);
+                notifyTooltipChanged(fieldTooltip);
+                return;
+            }
+            
+            // Valid CSV, no variables - just show field tooltip
+            csvTextField.setToolTipText(fieldTooltip);
+            notifyTooltipChanged(fieldTooltip);
+        } else {
+            // No valid field detected - clear tooltip unless there's an error
+            if (!hasError) {
+                csvTextField.setToolTipText(null);
+                notifyTooltipChanged(null);
+            }
+        }
+    }
+    
+    private void notifyTooltipChanged(String tooltipText) {
+        if (onTooltipChangedCallback != null) {
+            onTooltipChangedCallback.accept(tooltipText);
+        }
+    }
+    
+    private int getCurrentFieldIndex(String csvLine, int caretPosition) {
+        if (csvLine == null || csvLine.isEmpty() || caretPosition < 0) {
+            return -1;
+        }
+        
+        // Find the bracket part (first field)
+        int bracketStart = csvLine.indexOf('[');
+        int bracketEnd = csvLine.indexOf(']');
+        
+        if (bracketStart == -1 || bracketEnd == -1) {
+            // No brackets found, check if we're before first comma
+            int firstComma = csvLine.indexOf(',');
+            if (firstComma == -1) {
+                return 1; // Only one field (LEDs)
+            }
+            if (caretPosition < firstComma) {
+                return 1; // In first field (LEDs)
+            }
+            // If at or after first comma, count commas to determine field
+            // Field 2 starts after the first comma
+            return countCommasAfter(csvLine, firstComma, caretPosition) + 2;
+        }
+        
+        // Check if cursor is inside brackets (field 1: LEDs)
+        if (caretPosition >= bracketStart && caretPosition <= bracketEnd) {
+            return 1;
+        }
+        
+        // Find the comma after the closing bracket
+        int commaAfterBracket = bracketEnd + 1;
+        while (commaAfterBracket < csvLine.length() && csvLine.charAt(commaAfterBracket) != ',') {
+            commaAfterBracket++;
+        }
+        
+        if (commaAfterBracket >= csvLine.length()) {
+            // No comma found - if cursor is after bracket, still in field 1
+            if (caretPosition > bracketEnd) {
+                return 1;
+            }
+            return -1;
+        }
+        
+        // If cursor is before the comma after bracket, we're in field 1
+        if (caretPosition < commaAfterBracket) {
+            return 1;
+        }
+        
+        // If cursor is at or after the comma, we're in the next field
+        // Count commas after the bracket comma to determine field index
+        // Field 2 starts after the comma after bracket
+        int fieldIndex = countCommasAfter(csvLine, commaAfterBracket, caretPosition) + 2;
+        
+        return fieldIndex;
+    }
+    
+    private int countCommasAfter(String text, int startPos, int endPos) {
+        int count = 0;
+        for (int i = startPos + 1; i < endPos && i < text.length(); i++) {
+            if (text.charAt(i) == ',') {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    private String getFieldTooltip() {
+        String csvLine = csvTextField.getText();
+        if (csvLine == null || csvLine.trim().isEmpty()) {
+            return null;
+        }
+        int caretPosition = csvTextField.getCaretPosition();
+        int fieldIndex = getCurrentFieldIndex(csvLine, caretPosition);
+        return fieldIndex > 0 ? getFieldTooltipText(fieldIndex) : null;
+    }
+    
+    private String getFieldTooltipText(int fieldIndex) {
+        switch (fieldIndex) {
+            case 1:
+                return "Leds";
+            case 2:
+                return "Start RPM";
+            case 3:
+                return "End RPM";
+            case 4:
+                return "Start Red";
+            case 5:
+                return "Start Green";
+            case 6:
+                return "Start Blue";
+            case 7:
+                return "End Red";
+            case 8:
+                return "End Green";
+            case 9:
+                return "End Blue";
+            case 10:
+                return "Blink type, 0=solid, 1=fade, 2=blink";
+            case 11:
+                return "Effect interval";
+            default:
+                return null;
         }
     }
 
@@ -401,6 +627,14 @@ public class ImageRowPanel extends JPanel {
 
     public void setOnValidityChangedCallback(Runnable callback) {
         this.onValidityChangedCallback = callback;
+    }
+
+    public void setOnTooltipChangedCallback(java.util.function.Consumer<String> callback) {
+        this.onTooltipChangedCallback = callback;
+    }
+    
+    public JTextField getCsvTextField() {
+        return csvTextField;
     }
 
     private void notifyValidityChanged() {
