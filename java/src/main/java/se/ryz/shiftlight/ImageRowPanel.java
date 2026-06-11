@@ -456,6 +456,10 @@ public class ImageRowPanel extends JPanel {
     }
     
     private String getFieldTooltipText(int fieldIndex) {
+        // Determine if we're in leeway field based on CSV content
+        String csvLine = csvTextField.getText();
+        boolean isLeewayField = isLeewayField(csvLine, fieldIndex);
+        
         switch (fieldIndex) {
             case 1:
                 return "Leds";
@@ -478,10 +482,58 @@ public class ImageRowPanel extends JPanel {
             case 10:
                 return "Blink type, 0=solid, 1=fade, 2=blink";
             case 11:
-                return "Effect interval";
+                if (isLeewayField) {
+                    return "Leeway";
+                } else {
+                    return "Effect interval";
+                }
+            case 12:
+                return "Leeway";
             default:
                 return null;
         }
+    }
+    
+    private boolean isLeewayField(String csvLine, int fieldIndex) {
+        if (csvLine == null || csvLine.trim().isEmpty()) {
+            return false;
+        }
+        
+        // Leeway is the last field
+        // When blink mode is 0: leeway is field 11
+        // When blink mode != 0: leeway is field 12
+        if (fieldIndex == 11) {
+            // Check if blink mode is 0 by trying to parse
+            try {
+                String trimmed = csvLine.trim();
+                int bracketEnd = trimmed.indexOf(']');
+                if (bracketEnd == -1) {
+                    return false;
+                }
+                String rest = trimmed.substring(bracketEnd + 1).trim();
+                if (!rest.startsWith(",")) {
+                    return false;
+                }
+                rest = rest.substring(1);
+                String[] parts = rest.split(",");
+                if (parts.length >= 10) {
+                    // Check blink mode (9th value, index 8)
+                    try {
+                        int blinkMode = Integer.parseInt(parts[8].trim());
+                        // If blink mode is 0, field 11 is leeway
+                        // If blink mode != 0, field 11 is optional, field 12 is leeway
+                        return blinkMode == 0;
+                    } catch (NumberFormatException e) {
+                        // Can't parse, assume it's not leeway
+                        return false;
+                    }
+                }
+            } catch (Exception e) {
+                // Can't determine, default to false
+                return false;
+            }
+        }
+        return fieldIndex == 12;
     }
 
     private void pickStartColor() {
@@ -542,8 +594,9 @@ public class ImageRowPanel extends JPanel {
                 // Split the remaining part by commas (these are the actual separators)
                 String[] parts = rest.split(",");
                 
-                // Handle optional value: can have 9 values (without optional) or 10 values (with optional)
-                if (parts.length < 9 || parts.length > 10) {
+                // Handle leeway: can have 10 values (blink mode 0: 9 existing + blink mode + leeway) 
+                // or 11 values (blink mode != 0: 9 existing + blink mode + optional + leeway)
+                if (parts.length < 10 || parts.length > 11) {
                     return; // Invalid number of parts
                 }
                 
@@ -555,15 +608,19 @@ public class ImageRowPanel extends JPanel {
                 parts[6] = String.valueOf(endColor.getGreen());   // endGreen
                 parts[7] = String.valueOf(endColor.getBlue());    // endBlue
                 
-                // If blinkMode (parts[8]) is 0, remove the optional value (parts[9]) if present
+                // Preserve leeway (last value)
+                String leewayValue = parts[parts.length - 1];
+                
+                // If blinkMode (parts[8]) is 0, remove the optional value (parts[9]) if present, but keep leeway
                 String[] finalParts = parts;
-                if (parts.length == 10) {
+                if (parts.length == 11) {
                     try {
                         int blinkMode = Integer.parseInt(parts[8].trim());
                         if (blinkMode == 0) {
-                            // Remove the optional value (last element)
-                            finalParts = new String[9];
+                            // Remove the optional value (parts[9]), but keep leeway (parts[10])
+                            finalParts = new String[10];
                             System.arraycopy(parts, 0, finalParts, 0, 9);
+                            finalParts[9] = leewayValue; // Keep leeway as last value
                         }
                     } catch (NumberFormatException e) {
                         // If blinkMode is not a number, keep all parts

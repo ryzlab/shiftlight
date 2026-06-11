@@ -20,6 +20,7 @@ public class Image {
     private int endBlue;
     private String blinkMode;
     private Integer optionalValue; // Optional value (0-255) when blinkMode != 0
+    private int leeway; // Leeway value (0-255), always required
 
     public Image(String csvLine) {
         parseCsvLine(csvLine, null);
@@ -57,7 +58,9 @@ public class Image {
         ledIndices = parseLedIndices(ledPart.substring(1, ledPart.length() - 1));
         
         // Parse the remaining values, supporting variable expressions
-        // First 8 values are always required
+        // First 8 values are always required, plus blink mode, plus leeway
+        // When blink mode is 0: need 10 values total (9 existing + leeway)
+        // When blink mode != 0: need 11 values total (9 existing + optional + leeway)
         if (parts.length < 9) {
             throw new IllegalArgumentException("CSV line must have at least 10 values (9 commas outside brackets)");
         }
@@ -119,25 +122,37 @@ public class Image {
         
         // If blinkMode is not 0, expect an optional value (10th value)
         optionalValue = null;
+        int leewayIndex;
         if (blinkModeValue != 0) {
-            if (parts.length < 10) {
-                throw new IllegalArgumentException("When blink mode is not 0, an additional value (0-255) is required");
+            if (parts.length < 11) {
+                throw new IllegalArgumentException("When blink mode is not 0, an optional value (0-255) and leeway (0-255) are required");
             }
             int optional = parseNumericValue(parts[9].trim(), variableParser);
             if (optional < 0 || optional > 255) {
                 throw new IllegalArgumentException("Optional value must be in range 0-255, got: " + optional);
             }
             optionalValue = optional;
+            leewayIndex = 10;
             
             // Validate we don't have extra values
-            if (parts.length > 10) {
-                throw new IllegalArgumentException("CSV line has too many values. Expected 10 values when blink mode is not 0, got: " + (parts.length + 1));
+            if (parts.length > 11) {
+                throw new IllegalArgumentException("CSV line has too many values. Expected 11 values when blink mode is not 0, got: " + (parts.length + 1));
             }
         } else {
-            // When blinkMode is 0, we should have exactly 9 values
-            if (parts.length > 9) {
-                throw new IllegalArgumentException("CSV line has too many values. When blink mode is 0, expected 9 values, got: " + (parts.length + 1));
+            // When blinkMode is 0, we should have exactly 10 values (9 existing + leeway)
+            if (parts.length < 10) {
+                throw new IllegalArgumentException("CSV line must include leeway value (0-255). When blink mode is 0, expected 10 values, got: " + (parts.length + 1));
             }
+            if (parts.length > 10) {
+                throw new IllegalArgumentException("CSV line has too many values. When blink mode is 0, expected 10 values, got: " + (parts.length + 1));
+            }
+            leewayIndex = 9;
+        }
+        
+        // Parse leeway (always required, last value)
+        leeway = parseNumericValue(parts[leewayIndex].trim(), variableParser);
+        if (leeway < 0 || leeway > 255) {
+            throw new IllegalArgumentException("Leeway must be in range 0-255, got: " + leeway);
         }
     }
 
@@ -230,6 +245,7 @@ public class Image {
         } else {
             sb.append(",").append(optionalValue);
         }
+        sb.append(",").append(leeway);
         return sb.toString();
     }
 
